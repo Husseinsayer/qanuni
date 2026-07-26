@@ -1,0 +1,65 @@
+import { PageHeader } from "@/components/page-header";
+
+export const metadata = {
+  title: "الشروط والأحكام | منصة قانوني",
+  description: "الشروط والأحكام لاستخدام منصة قانوني.",
+};
+
+export default function TermsPage() {
+  return (
+    <>
+      <PageHeader
+        eyebrow="قانوني"
+        title="الشروط والأحكام"
+        crumbs={[{ label: "الرئيسية", href: "/" }, { label: "الشروط والأحكام" }]}
+      />
+      <section className="container max-w-3xl pb-20">
+        <div className="prose prose-lg rtl:prose-right max-w-none text-foreground/90 leading-relaxed">
+          <p className="text-lg text-muted-foreground">
+            آخر تحديث: يوليو 2026
+          </p>
+
+          <h2 className="text-xl font-bold mt-8">١. قبول الشروط</h2>
+          <p>
+            باستخدامك لمنصة قانوني، أنت توافق على هذه الشروط والأحكام. إذا كنت لا توافق على أي منها، يرجى عدم استخدام المنصة.
+          </p>
+
+          <h2 className="text-xl font-bold mt-8">٢. وصف الخدمة</h2>
+          <p>
+            توفر منصة قانوني مكتبة رقمية للقوانين العراقية ودليل شامل للمحامين العراقيين. المحتوى المقدم لأغراض معلوماتية فقط ولا يُعد استشارة قانونية.
+          </p>
+
+          <h2 className="text-xl font-bold mt-8">٣. المستخدمون</h2>
+          <p>
+            أنت مسؤول عن الحفاظ على سرية حسابك (إن وُجد) وعن جميع الأنشطة التي تحدث تحت حسابك.
+          </p>
+
+          <h2 className="text-xl font-bold mt-8">٤. المحتوى</h2>
+          <p>
+            جميع النصوص القانونية مأخوذة من المصادر الرسمية Iraqi jurisdictions. ومع ذلك، ننصح دائماً بالرجوع إلى المحامين المتخصصين للحصول على استشارة قانونية محددة.
+          </p>
+
+          <h2 className="text-xl font-bold mt-8">٥. الملكية الفكرية</h2>
+          <p>
+            جميع المحتويات والتصاميم والشعارات على المنصة محمية بموجب قوانين الملكية الفكرية ولا يجوز نسخها دون إذن.
+          </p>
+
+          <h2 className="text-xl font-bold mt-8">٦. تعليق الخدمة</h2>
+          <p>
+            نحتفظ بالحق في تعليق أو إيقاف الخدمة مؤقتاً أو دائماً دون إشعار مسبق لأسباب صيانة أو تحديث.
+          </p>
+
+          <h2 className="text-xl font-bold mt-8">٧. تعديل الشروط</h2>
+          <p>
+            نحتفظ بالحق في تعديل هذه الشروط في أي وقت. استمرارك في استخدام المنصة بعد التعديلات يُعد قبولاً للشروط المحدثة.
+          </p>
+
+          <h2 className="text-xl font-bold mt-8">٨. التواصل</h2>
+          <p>
+            لأي استفسارات حول الشروط والأحكام، يرجى التواصل معنا عبر قنوات التواصل الموضحة في صفحة التواصل.
+          </p>
+        </div>
+      </section>
+    </>
+  );
+}
