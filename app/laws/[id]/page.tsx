@@ -12,7 +12,7 @@ export function generateStaticParams() {
 }
 
 // Make the page dynamic to support laws added via admin
-export const dynamic = "force-dynamic";
+// export const dynamic = "force-dynamic"; // Removed for static export
 
 export function generateMetadata({ params }: { params: { id: string } }): Metadata {
   const law = defaultLaws.find((l) => l.id === params.id);
