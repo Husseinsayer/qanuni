@@ -491,7 +491,7 @@ export function duplicateEmailTemplate(id: string): EmailTemplate | null {
 
 /* ─── Test Email ─── */
 
-export function sendTestEmail(recipient: string, subject: string, message: string): TestEmailResult {
+export function sendTestEmail(recipient: string, subject: string, _message: string): TestEmailResult {
   const settings = getEmailSettings();
   const logs: string[] = [];
   const start = Date.now();

@@ -10,12 +10,12 @@ import {
   Save,
   X,
   Check,
-  Scale,
   ShieldCheck,
+  Building2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useAdminData } from "@/lib/admin-data";
+import { useAdminData, getAdminData } from "@/lib/admin-data";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/lib/admin-toast";
 import { iconMap, iconNames } from "@/lib/icons";
@@ -31,17 +31,18 @@ const hueOptions = [
   "from-cyan-500 to-blue-600",
 ];
 
-type Tab = "hero" | "nav" | "services" | "features" | "testimonials" | "faq" | "stats" | "footer";
+type Tab = "hero" | "nav" | "features" | "testimonials" | "faq" | "stats" | "footer" | "partners" | "contact";
 
 const tabs: { id: Tab; label: string }[] = [
   { id: "hero", label: "الهيرو" },
   { id: "nav", label: "التنقل" },
-  { id: "services", label: "الخدمات" },
   { id: "features", label: "لماذا نحن" },
   { id: "testimonials", label: "آراء العملاء" },
   { id: "faq", label: "الأسئلة الشائعة" },
   { id: "stats", label: "الإحصائيات" },
   { id: "footer", label: "التذييل" },
+  { id: "partners", label: "الشركاء" },
+  { id: "contact", label: "التواصل" },
 ];
 
 function Input({
@@ -199,6 +200,7 @@ function HeroTab() {
       <CardContent className="grid gap-4 sm:grid-cols-2">
         <Input label="الشارة العلوية" value={hero.badge} onChange={(v) => patch("badge", v)} />
         <Input label="العنوان الرئيسي" value={hero.title} onChange={(v) => patch("title", v)} />
+        <Input label="العنوان المتدرج" value={hero.titleGradient} onChange={(v) => patch("titleGradient", v)} />
         <div className="sm:col-span-2">
           <Textarea label="النص الفرعي" value={hero.subtitle} onChange={(v) => patch("subtitle", v)} />
         </div>
@@ -329,115 +331,6 @@ function NavTab() {
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function ServicesTab() {
-  const { data, update } = useAdminData();
-  const services = data.services;
-  const [showForm, setShowForm] = React.useState(false);
-  const [editIdx, setEditIdx] = React.useState<number | null>(null);
-  const [title, setTitle] = React.useState("");
-  const [desc, setDesc] = React.useState("");
-  const [icon, setIcon] = React.useState("Scale");
-
-  const resetForm = () => {
-    setTitle("");
-    setDesc("");
-    setIcon("Scale");
-    setShowForm(false);
-    setEditIdx(null);
-  };
-
-  const add = () => {
-    if (!title.trim() || !desc.trim()) return;
-    const id = `s${Date.now()}`;
-    update("services", [...services, { id, title: title.trim(), desc: desc.trim(), icon }]);
-    resetForm();
-  };
-
-  const startEdit = (i: number) => {
-    setEditIdx(i);
-    setTitle(services[i].title);
-    setDesc(services[i].desc);
-    setIcon(services[i].icon);
-    setShowForm(true);
-  };
-
-  const saveEdit = () => {
-    if (editIdx === null) return;
-    const next = services.map((s, i) =>
-      i === editIdx ? { ...s, title: title.trim(), desc: desc.trim(), icon } : s
-    );
-    update("services", next);
-    resetForm();
-  };
-
-  const del = (i: number) => {
-    update("services", services.filter((_, idx) => idx !== i));
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button variant="accent" onClick={() => { resetForm(); setShowForm(true); }}>
-          <Plus className="size-4" /> إضافة خدمة
-        </Button>
-      </div>
-
-      {showForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{editIdx !== null ? "تعديل خدمة" : "خدمة جديدة"}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Input label="العنوان" value={title} onChange={setTitle} placeholder="الاستشارة القانونية" />
-            <Textarea label="الوصف" value={desc} onChange={setDesc} placeholder="وصف الخدمة..." />
-            <IconPicker value={icon} onChange={setIcon} />
-            <div className="flex gap-2">
-              <Button variant="accent" onClick={editIdx !== null ? saveEdit : add}>
-                <Save className="size-4" /> {editIdx !== null ? "حفظ" : "إضافة"}
-              </Button>
-              <Button variant="outline" onClick={resetForm}>
-                إلغاء
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {services.map((s, i) => {
-          const Icon = iconMap[s.icon] || Scale;
-          return (
-            <Card key={s.id}>
-              <CardContent className="p-4">
-                <div className="mb-3 flex items-start justify-between">
-                  <div className="grid size-10 place-items-center rounded-xl bg-accent/10 text-accent">
-                    <Icon className="size-5" />
-                  </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => startEdit(i)}>
-                      <Pencil className="size-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => del(i)}
-                      className="text-red-500 hover:text-red-600"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
-                </div>
-                <h4 className="text-sm font-bold">{s.title}</h4>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{s.desc}</p>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 
@@ -789,6 +682,116 @@ function FaqTab() {
   );
 }
 
+function PartnersTab() {
+  const { data, update } = useAdminData();
+  const partners = data.partners;
+  const [showForm, setShowForm] = React.useState(false);
+  const [editIdx, setEditIdx] = React.useState<number | null>(null);
+  const [name, setName] = React.useState("");
+  const [title, setTitle] = React.useState("");
+  const [icon, setIcon] = React.useState("Building2");
+  const [url, setUrl] = React.useState("");
+
+  const resetForm = () => {
+    setName("");
+    setTitle("");
+    setIcon("Building2");
+    setUrl("");
+    setShowForm(false);
+    setEditIdx(null);
+  };
+
+  const add = () => {
+    if (!name.trim()) return;
+    update("partners", [...partners, { id: `p${Date.now()}`, name: name.trim(), title: title.trim(), icon, url: url.trim() }]);
+    resetForm();
+  };
+
+  const startEdit = (i: number) => {
+    setEditIdx(i);
+    setName(partners[i].name);
+    setTitle(partners[i].title);
+    setIcon(partners[i].icon);
+    setUrl(partners[i].url);
+    setShowForm(true);
+  };
+
+  const saveEdit = () => {
+    if (editIdx === null) return;
+    const next = partners.map((p, i) => (i === editIdx ? { ...p, name: name.trim(), title: title.trim(), icon, url: url.trim() } : p));
+    update("partners", next);
+    resetForm();
+  };
+
+  const del = (i: number) => {
+    update("partners", partners.filter((_, idx) => idx !== i));
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button variant="accent" onClick={() => { resetForm(); setShowForm(true); }}>
+          <Plus className="size-4" /> إضافة شريك
+        </Button>
+      </div>
+
+      {showForm && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{editIdx !== null ? "تعديل شريك" : "شريك جديد"}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Input label="اسم الجهة" value={name} onChange={setName} placeholder="مثال: وزارة العدل العراقية" />
+            <Input label="نوع الشراكة" value={title} onChange={setTitle} placeholder="مثال: شريك استراتيجي" />
+            <IconPicker value={icon} onChange={setIcon} />
+            <Input label="رابط الموقع (اختياري)" value={url} onChange={setUrl} placeholder="https://..." />
+            <div className="flex gap-2">
+              <Button variant="accent" onClick={editIdx !== null ? saveEdit : add}>
+                <Save className="size-4" /> {editIdx !== null ? "حفظ" : "إضافة"}
+              </Button>
+              <Button variant="outline" onClick={resetForm}>
+                إلغاء
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {partners.map((p, i) => (
+          <Card key={p.id}>
+            <CardContent className="flex items-center gap-3 p-4">
+              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent">
+                {React.createElement(
+                  (iconMap as Record<string, React.ComponentType<{ className?: string }>>)[p.icon] ?? Building2,
+                  { className: "size-5" }
+                )}
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-bold">{p.name}</h4>
+                <p className="text-xs text-muted-foreground">{p.title}</p>
+              </div>
+              <div className="flex shrink-0 gap-1">
+                <Button variant="ghost" size="sm" onClick={() => startEdit(i)}>
+                  <Pencil className="size-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => del(i)}
+                  className="text-red-500 hover:text-red-600"
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function StatsTab() {
   const { data, update } = useAdminData();
   const stats = data.stats;
@@ -890,7 +893,7 @@ function StatsTab() {
                 </div>
               </div>
               <div className="mt-2 text-2xl font-extrabold">
-                {s.value.toLocaleString("ar-EG")}
+                {s.value.toLocaleString("en-US")}
                 <span className="text-accent">{s.suffix}</span>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">{s.label}</p>
@@ -899,6 +902,31 @@ function StatsTab() {
         ))}
       </div>
     </div>
+  );
+}
+
+function ContactTab() {
+  const { data, update } = useAdminData();
+  const contact = data.contact;
+
+  const patch = (field: string, value: string) => {
+    update("contact", { ...contact, [field]: value });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>معلومات التواصل</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-4 sm:grid-cols-2">
+        <Input label="الهاتف" value={contact.phone} onChange={(v) => patch("phone", v)} placeholder="+964 770 000 0000" />
+        <Input label="البريد الإلكتروني" value={contact.email} onChange={(v) => patch("email", v)} placeholder="info@qanuni.iq" />
+        <div className="sm:col-span-2">
+          <Input label="العنوان" value={contact.address} onChange={(v) => patch("address", v)} />
+        </div>
+        <Input label="ساعات العمل" value={contact.workingHours} onChange={(v) => patch("workingHours", v)} />
+      </CardContent>
+    </Card>
   );
 }
 
@@ -980,6 +1008,7 @@ export default function ContentPage() {
   const [activeTab, setActiveTab] = React.useState<Tab>("hero");
   const { reset } = useAdminData();
   const [confirmReset, setConfirmReset] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
 
   const handleReset = () => {
     if (confirmReset) {
@@ -992,14 +1021,70 @@ export default function ContentPage() {
     }
   };
 
+  const handleSaveToDb = async () => {
+    setSaving(true);
+    try {
+      // Read fresh data from localStorage to avoid stale state
+      // (tab components each have their own useAdminData() instance)
+      const freshData = getAdminData();
+      const res = await fetch("/api/site-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hero: freshData.hero,
+          footer: {
+            ...freshData.footer,
+            socials: freshData.footer.socials,
+            legalLinks: freshData.footer.legalLinks,
+          },
+          stats: freshData.stats,
+          features: freshData.features,
+          testimonials: freshData.testimonials.map((t) => ({
+            name: t.name,
+            role: t.role,
+            rating: t.rating,
+            text: t.text,
+            initials: t.initials,
+            hue: t.hue,
+          })),
+          faqs: freshData.faqs,
+          partners: freshData.partners,
+          config: {
+            contact: JSON.stringify(freshData.contact),
+            seo_basics: JSON.stringify({
+              siteName: freshData.seo.general.siteName,
+              shortName: freshData.seo.general.shortName,
+              tagline: freshData.seo.general.tagline,
+              companyName: freshData.seo.general.companyName,
+              email: freshData.seo.general.email,
+              phone: freshData.seo.general.phone,
+              themeColor: freshData.seo.meta.themeColor,
+              metadataBase: freshData.seo.meta.metadataBase,
+              defaultTitle: freshData.seo.meta.defaultTitle,
+              defaultDescription: freshData.seo.meta.defaultDescription,
+            }),
+          },
+        }),
+      });
+      if (res.ok) {
+        toast.success("تم الحفظ", "تم حفظ جميع التغييرات في قاعدة البيانات بنجاح");
+      } else {
+        const err = await res.json();
+        toast.error("خطأ", err.error || "فشل الحفظ");
+      }
+    } catch {
+      toast.error("خطأ", "فشل الاتصال بالخادم");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const renderTab = () => {
     switch (activeTab) {
       case "hero":
         return <HeroTab />;
       case "nav":
         return <NavTab />;
-      case "services":
-        return <ServicesTab />;
       case "features":
         return <FeaturesTab />;
       case "testimonials":
@@ -1010,6 +1095,10 @@ export default function ContentPage() {
         return <StatsTab />;
       case "footer":
         return <FooterTab />;
+      case "partners":
+        return <PartnersTab />;
+      case "contact":
+        return <ContactTab />;
     }
   };
 
@@ -1023,14 +1112,24 @@ export default function ContentPage() {
               تعديل جميع محتويات الموقع من مكان واحد
             </p>
           </div>
-          <Button
-            variant={confirmReset ? "accent" : "outline"}
-            onClick={handleReset}
-            className="gap-2"
-          >
-            <RotateCcw className="size-4" />
-            {confirmReset ? "تأكيد إعادة التعيين؟" : "إعادة تعيين"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleSaveToDb}
+              disabled={saving}
+              className="gap-2 bg-accent text-white hover:bg-accent/90"
+            >
+              <Save className="size-4" />
+              {saving ? "جارٍ الحفظ..." : "حفظ في قاعدة البيانات"}
+            </Button>
+            <Button
+              variant={confirmReset ? "accent" : "outline"}
+              onClick={handleReset}
+              className="gap-2"
+            >
+              <RotateCcw className="size-4" />
+              {confirmReset ? "تأكيد إعادة التعيين؟" : "إعادة تعيين"}
+            </Button>
+          </div>
         </div>
 
         <div className="mb-6 flex gap-2 overflow-x-auto pb-2">

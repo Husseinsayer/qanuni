@@ -1,22 +1,23 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useSession, signOut } from "next-auth/react";
 import {
-  LayoutDashboard, User, Palette, FileText, LogOut, DollarSign, Clock, Star, BarChart3,
-  Scale, Menu, X, ChevronDown, PanelRightClose, PanelRightOpen,
-  Sun, Moon, Bell, Mail,
+  LayoutDashboard, User, Palette, LogOut, DollarSign, Clock, Star, BarChart3,
+  Scale, Menu, X, PanelRightClose, PanelRightOpen,
+  Sun, Moon, Bell, Mail, FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
-import { isUserLoggedIn, getUserSession, logoutUser } from "@/lib/user-auth";
 
 type NavItem = { label: string; href: string; icon: React.ComponentType<{ className?: string }> };
 
 const navItems: NavItem[] = [
   { label: "لوحة التحكم", href: "/lawyer/dashboard", icon: LayoutDashboard },
   { label: "الملف الشخصي", href: "/lawyer/profile", icon: User },
+  { label: "المقالات", href: "/lawyer/dashboard/articles", icon: FileText },
   { label: "الرسائل", href: "/lawyer/messages", icon: Mail },
   { label: "المظهر", href: "/lawyer/appearance", icon: Palette },
   { label: "الخدمات", href: "/lawyer/services", icon: DollarSign },
@@ -25,11 +26,11 @@ const navItems: NavItem[] = [
   { label: "التحليلات", href: "/lawyer/analytics", icon: BarChart3 },
 ];
 
-function LawyerSidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: {
+function LawyerSidebar({ collapsed, onToggle, mobileOpen, onMobileClose, session }: {
   collapsed: boolean; onToggle: () => void; mobileOpen: boolean; onMobileClose: () => void;
+  session: { name?: string | null };
 }) {
   const pathname = usePathname();
-  const session = getUserSession();
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
@@ -101,35 +102,141 @@ function LawyerSidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: {
   );
 }
 
+function bridgeSession(session: { id: string; name?: string | null; email?: string | null }) {
+  if (typeof window === "undefined") return;
+  const expiry = Date.now() + 1000 * 60 * 60 * 24;
+  const localStorageSession = {
+    userId: session.id,
+    name: session.name || "",
+    email: session.email || "",
+    role: "lawyer" as const,
+    token: crypto.randomUUID(),
+    expiry,
+  };
+  localStorage.setItem("user_session", JSON.stringify(localStorageSession));
+
+  const accountsRaw = localStorage.getItem("user_accounts");
+  const accounts = accountsRaw ? JSON.parse(accountsRaw) : [];
+  const hasAccount = accounts.some((a: { email: string }) => a.email === session.email);
+  if (!hasAccount) {
+    accounts.push({
+      id: session.id,
+      name: session.name || "",
+      email: session.email || "",
+      phone: "",
+      passwordHash: "",
+      role: "lawyer",
+      createdAt: new Date().toISOString(),
+    });
+    localStorage.setItem("user_accounts", JSON.stringify(accounts));
+  }
+}
+
+function seedProfileFromDB() {
+  if (typeof window === "undefined") return;
+  const sessionRaw = localStorage.getItem("user_session");
+  let sessionUserId = "";
+  try {
+    const s = sessionRaw ? JSON.parse(sessionRaw) : null;
+    sessionUserId = s?.userId || "";
+  } catch {}
+
+  fetch("/api/lawyer/profile")
+    .then((r) => r.json())
+    .then((data) => {
+      if (data.lawyer) {
+        const lawyer = data.lawyer;
+        const languages = typeof lawyer.languages === "string" ? JSON.parse(lawyer.languages) : lawyer.languages || ["العربية"];
+        const profileId = sessionUserId || lawyer.id;
+        const profile = {
+          id: profileId,
+          dbLawyerId: lawyer.id,
+          name: data.user?.name || lawyer.name,
+          slug: lawyer.slug || "",
+          city: lawyer.city || "بغداد",
+          specialization: lawyer.specialization || "القانون المدني",
+          experience: lawyer.experience || 0,
+          rating: lawyer.rating || 0,
+          reviews: lawyer.reviewCount || 0,
+          verified: lawyer.verified || false,
+          price: lawyer.price || 0,
+          online: lawyer.online || false,
+          gender: lawyer.gender || "male",
+          languages,
+          bio: lawyer.bio || "",
+          initials: lawyer.initials || (data.user?.name || "").slice(0, 2),
+          hue: lawyer.hue || "from-blue-600 to-indigo-700",
+          whatsapp: lawyer.whatsapp || "",
+          telegram: lawyer.telegram || "",
+          facebook: lawyer.facebook || "",
+          instagram: lawyer.instagram || "",
+          email: data.user?.email || "",
+          password: "",
+        };
+
+        const profilesRaw = localStorage.getItem("lawyer_profiles");
+        const profiles = profilesRaw ? JSON.parse(profilesRaw) : [];
+        const existingIdx = profiles.findIndex((p: { id: string }) => p.id === profile.id);
+        if (existingIdx >= 0) {
+          profiles[existingIdx] = profile;
+        } else {
+          profiles.push(profile);
+        }
+        localStorage.setItem("lawyer_profiles", JSON.stringify(profiles));
+
+        const adminRaw = localStorage.getItem("admin_site_data");
+        const adminData = adminRaw ? JSON.parse(adminRaw) : {};
+        if (!adminData.lawyers) adminData.lawyers = [];
+        const adminIdx = adminData.lawyers.findIndex((l: { id: string }) => l.id === profile.id);
+        if (adminIdx >= 0) {
+          adminData.lawyers[adminIdx] = profile;
+        } else {
+          adminData.lawyers.push(profile);
+        }
+        localStorage.setItem("admin_site_data", JSON.stringify(adminData));
+      }
+    })
+    .catch(() => {});
+}
+
 export default function LawyerLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
   const { theme, setTheme } = useTheme();
+  const bridgedRef = useRef(false);
+
+  // Bridge session synchronously before children render
+  if (status === "authenticated" && session?.user && !bridgedRef.current && typeof window !== "undefined") {
+    bridgedRef.current = true;
+    bridgeSession({ id: session.user.id, name: session.user.name, email: session.user.email });
+    seedProfileFromDB();
+  }
 
   useEffect(() => {
-    const session = getUserSession();
-    if (!session || session.role !== "lawyer") {
+    if (status === "loading") return;
+    if (!session) {
       router.push("/auth/login");
-    } else {
-      setAuthChecked(true);
+    } else if (session.user?.role !== "lawyer") {
+      router.push("/auth/login");
     }
-  }, [router]);
+  }, [session, status, router]);
 
-  const handleLogout = () => {
-    logoutUser();
-    router.push("/");
-  };
-
-  if (!authChecked) return null;
+  if (status === "loading" || !session || session.user?.role !== "lawyer") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-accent border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-background" dir="rtl">
       <LawyerSidebar
         collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)}
         mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)}
+        session={session.user}
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -140,13 +247,13 @@ export default function LawyerLayout({ children }: { children: React.ReactNode }
             >
               <Menu className="h-5 w-5" />
             </button>
-            <a href="/" className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-accent">
+            <Link href="/" className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-accent">
               العودة للموقع
-            </a>
+            </Link>
           </div>
 
           <div className="flex items-center gap-2">
-            <button onClick={handleLogout} title="تسجيل الخروج"
+            <button onClick={() => signOut({ callbackUrl: "/" })} title="تسجيل الخروج"
               className="rounded-xl p-2.5 text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
             >
               <LogOut className="h-5 w-5" />

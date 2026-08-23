@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/card";
 import { useAdminContext } from "../../admin-context";
 import { getPendingPromotions, getPromotedLawyers, approvePromotion, rejectPromotion, removePromotion } from "@/lib/lawyer-profiles";
 import { ArrowRight, Check, X, Megaphone, Clock, Star, MapPin, Award, ShieldCheck, Trash2 } from "lucide-react";
-import { toArabicDigits } from "@/lib/utils";
 import { toast } from "@/lib/admin-toast";
 import type { Lawyer } from "@/lib/data";
 

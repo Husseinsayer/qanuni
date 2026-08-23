@@ -6,11 +6,11 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  Mail, Settings, Shield, Inbox, Palette, FileText,
-  Save, RotateCcw, Send, Eye, EyeOff, Lock, Unlock,
-  CheckCircle2, XCircle, AlertTriangle, Download, Upload,
-  Bell, Zap, Globe, Server, Key, Clock, Users,
-  Activity, RotateCw, Database, Cpu, ListOrdered,
+  Mail, Settings, Shield, Inbox,
+  Save, RotateCcw, Send, Eye, EyeOff, Lock,
+  CheckCircle2, AlertTriangle, Download, Upload,
+  Bell, Zap, Globe, Server, Key,
+  Activity, RotateCw, Database,
 } from "lucide-react";
 import {
   getEmailSettings, saveEmailSettings, sendTestEmail,

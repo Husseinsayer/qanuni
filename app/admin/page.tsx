@@ -14,6 +14,9 @@ import {
   Landmark,
   Clock,
   ArrowLeft,
+  AlertCircle,
+  Building2,
+  UserCheck,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -52,6 +55,46 @@ function StatCard({
   );
 }
 
+function PendingCard({
+  icon: Icon,
+  label,
+  value,
+  href,
+  gradient,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number;
+  href: string;
+  gradient: string;
+}) {
+  return (
+    <Link href={href}>
+      <Card className="relative overflow-hidden card-hover cursor-pointer transition-transform hover:scale-[1.02]">
+        <CardContent className="p-5">
+          <div className="flex items-center gap-4">
+            <div
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${gradient} text-white shadow-soft`}
+            >
+              <Icon className="h-6 w-6" />
+            </div>
+            <div className="flex-1">
+              <p className="text-2xl font-extrabold tracking-tight text-foreground">
+                {value}
+              </p>
+              <p className="mt-0.5 text-sm font-medium text-muted-foreground">{label}</p>
+            </div>
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+          </div>
+        </CardContent>
+        <div
+          className={`absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r ${gradient}`}
+        />
+      </Card>
+    </Link>
+  );
+}
+
 export default function AdminDashboard() {
   const { data } = useAdminContext();
 
@@ -68,6 +111,12 @@ export default function AdminDashboard() {
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 3);
   const recentLawyers = data.lawyers.slice(0, 3);
+
+  const pendingLawyers = data.users.filter((u) => u.role === "lawyer" && u.status === "pending").length;
+  const pendingUsers = data.users.filter((u) => u.role === "user" && u.status === "pending").length;
+  const pendingArticles = data.articles.filter((a: any) => a.status === "pending" || !a.status).length;
+  const pendingFirms = data.lawFirms.filter((f: any) => f.status === "pending" || !f.status).length;
+  const hasPending = pendingLawyers > 0 || pendingUsers > 0 || pendingArticles > 0 || pendingFirms > 0;
 
   return (
     <div className="mx-auto max-w-7xl space-y-8">
@@ -104,6 +153,47 @@ export default function AdminDashboard() {
         </div>
       </Reveal>
 
+      {hasPending && (
+        <Reveal delay={0.05}>
+          <div>
+            <h2 className="mb-3 text-lg font-bold flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              قيد الانتظار
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <PendingCard
+                icon={Users}
+                label="محامون قيد المراجعة"
+                value={pendingLawyers}
+                href="/admin/lawyers"
+                gradient="from-blue-500 to-indigo-600"
+              />
+              <PendingCard
+                icon={UserCheck}
+                label="مستخدمون قيد المراجعة"
+                value={pendingUsers}
+                href="/admin/users"
+                gradient="from-emerald-500 to-teal-600"
+              />
+              <PendingCard
+                icon={FileText}
+                label="مقالات قيد المراجعة"
+                value={pendingArticles}
+                href="/admin/articles"
+                gradient="from-purple-500 to-fuchsia-600"
+              />
+              <PendingCard
+                icon={Building2}
+                label="مكاتب قيد المراجعة"
+                value={pendingFirms}
+                href="/admin/law-firms"
+                gradient="from-amber-500 to-orange-600"
+              />
+            </div>
+          </div>
+        </Reveal>
+      )}
+
       <Reveal delay={0.1}>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Link href="/admin/lawyers">
@@ -126,7 +216,7 @@ export default function AdminDashboard() {
             <StatCard
               icon={Eye}
               label="إجمالي المشاهدات"
-              value={totalViews.toLocaleString("ar-IQ")}
+              value={totalViews.toLocaleString("en-US")}
               gradient="from-amber-500 to-orange-600"
             />
           </Link>
@@ -199,11 +289,19 @@ export default function AdminDashboard() {
                     className="flex items-center justify-between rounded-xl border border-border p-3 transition-colors hover:bg-muted/40"
                   >
                     <div className="flex items-center gap-3">
-                      <div
-                        className={`flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br ${lawyer.hue} text-sm font-bold text-white`}
-                      >
-                        {lawyer.initials}
-                      </div>
+                      {lawyer.photoUrl ? (
+                        <img
+                          src={lawyer.photoUrl}
+                          alt={lawyer.name}
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className={`flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br ${lawyer.hue} text-sm font-bold text-white`}
+                        >
+                          {lawyer.initials}
+                        </div>
+                      )}
                       <div>
                         <p className="text-sm font-semibold text-foreground">
                           {lawyer.name}

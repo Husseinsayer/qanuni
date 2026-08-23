@@ -1,8 +1,41 @@
 // ===== Iraqi Legal Assistant - RAG Search Engine =====
 import type { SearchQuery, SearchResult, CaseType, MetadataMatch, EnhancedSearchResult, QuestionClassification } from "../types";
 import { sampleArticles, laws } from "@/lib/data";
+import { prisma } from "@/lib/prisma";
 import { getKnowledgeContext, searchKnowledgeCenter } from "@/lib/knowledge-center/search";
 import { classifyQuestion } from "./question-classifier";
+
+// Effective articles = static base overlaid with admin-edited articles from the
+// unified store (SiteConfig "adminData"). Cached briefly to avoid a DB hit on
+// every retrieval.
+type ArticleShape = { num: number; text: string };
+let _articlesCache: { data: Record<string, ArticleShape[]>; ts: number } | null = null;
+const ARTICLES_TTL = 30_000;
+
+async function getEffectiveArticles(): Promise<Record<string, ArticleShape[]>> {
+  if (_articlesCache && Date.now() - _articlesCache.ts < ARTICLES_TTL) {
+    return _articlesCache.data;
+  }
+  const base = sampleArticles as Record<string, ArticleShape[]>;
+  try {
+    const row = await prisma.siteConfig.findUnique({ where: { key: "adminData" } });
+    if (row?.value) {
+      const ad = JSON.parse(row.value) as { sampleArticles?: Record<string, ArticleShape[]> };
+      if (ad.sampleArticles && typeof ad.sampleArticles === "object") {
+        const merged: Record<string, ArticleShape[]> = { ...base };
+        for (const [k, v] of Object.entries(ad.sampleArticles)) {
+          if (Array.isArray(v)) merged[k] = v;
+        }
+        _articlesCache = { data: merged, ts: Date.now() };
+        return merged;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  _articlesCache = { data: base, ts: Date.now() };
+  return base;
+}
 
 // === Keyword Mapping for Case Types ===
 const caseTypeKeywords: Record<CaseType, string[]> = {
@@ -26,15 +59,16 @@ export type ArticleSearchResult = SearchResult & {
 };
 
 // === Main Search Function ===
-export function searchLaws(query: SearchQuery): ArticleSearchResult[] {
+export async function searchLaws(query: SearchQuery): Promise<ArticleSearchResult[]> {
   const results: ArticleSearchResult[] = [];
   const queryLower = query.text.toLowerCase();
   const queryWords = extractWords(queryLower);
+  const articlesMap = await getEffectiveArticles();
 
   // Search through all laws and their articles
   for (const law of laws) {
     const lawId = law.id;
-    const articles = sampleArticles[lawId] || [];
+    const articles = articlesMap[lawId] || [];
 
     for (const article of articles) {
       const articleText = article.text.toLowerCase();
@@ -94,11 +128,11 @@ export function searchLaws(query: SearchQuery): ArticleSearchResult[] {
 }
 
 // === Get Articles by Law ID ===
-export function getArticlesByLaw(lawId: string): ArticleSearchResult[] {
+export async function getArticlesByLaw(lawId: string): Promise<ArticleSearchResult[]> {
   const law = laws.find((l) => l.id === lawId);
   if (!law) return [];
 
-  const articles = sampleArticles[lawId] || [];
+  const articles = (await getEffectiveArticles())[lawId] || [];
   return articles.map((article) => ({
     lawId,
     lawName: law.name,
@@ -111,14 +145,14 @@ export function getArticlesByLaw(lawId: string): ArticleSearchResult[] {
 }
 
 // === Get Article by Law ID and Number ===
-export function getArticle(
+export async function getArticle(
   lawId: string,
   articleNumber: number
-): ArticleSearchResult | null {
+): Promise<ArticleSearchResult | null> {
   const law = laws.find((l) => l.id === lawId);
   if (!law) return null;
 
-  const articles = sampleArticles[lawId] || [];
+  const articles = (await getEffectiveArticles())[lawId] || [];
   const article = articles.find((a) => a.num === articleNumber);
   if (!article) return null;
 
@@ -242,13 +276,13 @@ function escapeRegex(str: string): string {
 }
 
 // === Combined Search: Laws + Knowledge Center ===
-export function combinedSearch(query: SearchQuery): {
+export async function combinedSearch(query: SearchQuery): Promise<{
   laws: ArticleSearchResult[];
   knowledgeContext: string;
   knowledgeResults: ReturnType<typeof searchKnowledgeCenter>;
-} {
+}> {
   // Search laws
-  const laws = searchLaws(query);
+  const laws = await searchLaws(query);
 
   // Search Knowledge Center
   const knowledgeResults = searchKnowledgeCenter({
@@ -308,7 +342,7 @@ export function findLawByQuery(query: string): MetadataMatch | null {
 export function searchLawMetadata(query: string): MetadataMatch[] {
   const results: MetadataMatch[] = [];
   const normalized = query.replace(/\s+/g, " ").trim();
-  const queryWords = normalized.split(/\s+/).filter((w) => w.length > 2);
+  // const queryWords = normalized.split(/\s+/).filter((w) => w.length > 2);
 
   for (const law of laws) {
     let score = 0;
@@ -341,11 +375,11 @@ export function searchLawMetadata(query: string): MetadataMatch[] {
 }
 
 // === Enhanced search: metadata + articles + classification ===
-export function enhancedSearch(
+export async function enhancedSearch(
   text: string,
   caseType: CaseType,
   options?: { limit?: number; threshold?: number }
-): EnhancedSearchResult {
+): Promise<EnhancedSearchResult> {
   const limit = options?.limit ?? 10;
   const threshold = options?.threshold ?? 20;
 
@@ -365,7 +399,7 @@ export function enhancedSearch(
     useSemantic: true,
     useExact: true,
   };
-  const articles = searchLaws(searchQuery);
+  const articles = await searchLaws(searchQuery);
 
   // 4. Search knowledge center
   const knowledgeResults = searchKnowledgeCenter({

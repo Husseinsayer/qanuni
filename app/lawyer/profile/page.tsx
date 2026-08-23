@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Save, User, MapPin, BookOpen, Briefcase, DollarSign, Globe, Phone, MessageCircle,
-  Camera, Star, Check, X, Plus, GraduationCap, Award, Shield, FileText,
-  Banknote, Search, Mail, Bell, Tag, ChevronLeft, PlusCircle, CheckCircle,
+  Save, User, Phone,
+  Camera, Check, X, Plus, GraduationCap, Award, Shield,
+  Search, Bell, CheckCircle,
   Megaphone, Clock, Calendar, AlertTriangle, CreditCard,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,7 +59,6 @@ export default function LawyerProfilePage() {
 
   // Awards state
   const [awards, setAwards] = useState<string[]>([]);
-  const [newAward, setNewAward] = useState("");
 
   // SEO
   const [seoDesc, setSeoDesc] = useState("");
@@ -83,18 +82,16 @@ export default function LawyerProfilePage() {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
 
   // Photo
-  const [photoUrl, setPhotoUrl] = useState("");
+  const [, setPhotoUrl] = useState("");
 
   // Languages
   const [langs, setLangs] = useState<string[]>(["العربية"]);
   const [newLang, setNewLang] = useState("");
 
   useEffect(() => {
-    const s = getUserSession();
-    if (!s || s.role !== "lawyer") { router.push("/auth/login"); return; }
     seedLawyerDemoData();
     const p = getMyLawyerProfile();
-    if (!p) { updateMyProfile({ name: s.name, initials: s.name.slice(0, 2) }); setProfile(getMyLawyerProfile()); }
+    if (!p) { const s = getUserSession(); if (s) { updateMyProfile({ name: s.name, initials: s.name.slice(0, 2) }); setProfile(getMyLawyerProfile()); } }
     else setProfile({ ...p });
     setLangs(p?.languages ?? ["العربية"]);
     setEducation(getMyEducation());
@@ -127,7 +124,7 @@ export default function LawyerProfilePage() {
     setProfile((prev) => (prev ? { ...prev, [field]: value } : prev));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!profile) return;
     updateMyProfile({ ...profile, languages: langs });
     // Save education
@@ -140,6 +137,32 @@ export default function LawyerProfilePage() {
     updateAwards(awards);
     updateSeo(seoDesc, seoKeywords);
     updateNotifications(notifEmail, notifPhone);
+
+    // Also save to API
+    try {
+      await fetch("/api/lawyer/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: profile.name,
+          city: profile.city,
+          specialization: profile.specialization,
+          experience: profile.experience,
+          price: profile.price,
+          bio: profile.bio,
+          gender: profile.gender,
+          languages: langs,
+          whatsapp: profile.whatsapp,
+          telegram: profile.telegram,
+          facebook: profile.facebook,
+          instagram: profile.instagram,
+          hue: profile.hue,
+          initials: profile.initials,
+          photoUrl: (profile as any).photoUrl || "",
+        }),
+      });
+    } catch { /* silent */ }
+
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
@@ -291,8 +314,8 @@ function BasicTab({ profile, setProfile, langs, setLangs, newLang, setNewLang }:
           {/* Photo Upload */}
           <div className="flex items-center gap-4">
             <div className="relative">
-              {(profile as any).photoUrl ? (
-                <img src={(profile as any).photoUrl} alt={profile.name} className="size-20 rounded-full object-cover border-2 border-accent" />
+              {profile.photoUrl ? (
+                <img src={profile.photoUrl} alt={profile.name} className="size-20 rounded-full object-cover border-2 border-accent" />
               ) : (
                 <div className={cn("grid size-20 place-items-center rounded-full text-2xl font-bold text-white", profile.hue)}>
                   {profile.initials}
@@ -646,7 +669,7 @@ function PromotionTab({
                 </p>
                 {promotionPlan.expiryDate && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    ينتهي في: {new Date(promotionPlan.expiryDate).toLocaleDateString("ar-IQ")}
+                    ينتهي في: {new Date(promotionPlan.expiryDate).toLocaleDateString("en-US")}
                   </p>
                 )}
               </div>
@@ -741,7 +764,7 @@ function SubscriptionTab({
   onCancelSubscription: () => void;
 }) {
   const formatPrice = (price: number) =>
-    price === 0 ? "مجاني" : `${price.toLocaleString("ar-IQ")} د.ع`;
+    price === 0 ? "مجاني" : `${price.toLocaleString("en-US")} د.ع`;
 
   const [msg, setMsg] = useState("");
 
@@ -785,7 +808,7 @@ function SubscriptionTab({
             </p>
             {subscription.expiryDate && (
               <p className="text-sm text-muted-foreground">
-                ينتهي في: {new Date(subscription.expiryDate).toLocaleDateString("ar-IQ")}
+                ينتهي في: {new Date(subscription.expiryDate).toLocaleDateString("en-US")}
               </p>
             )}
             {subscription.status === "active" && (

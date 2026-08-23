@@ -3,12 +3,12 @@
 import type { CaseType, RetrievalResult, ScoredArticle, SearchResult } from "../types";
 import { enhancedSearch } from "./search";
 
-export function retrieve(
+export async function retrieve(
   text: string,
   caseType: CaseType,
   options?: { limit?: number; threshold?: number }
-): RetrievalResult {
-  const search = enhancedSearch(text, caseType, options);
+): Promise<RetrievalResult> {
+  const search = await enhancedSearch(text, caseType, options);
   const { classification, articles, matchedLaw, metadataMatches, knowledgeContext } = search;
 
   // Convert articles to ScoredArticle[] with hybrid scoring

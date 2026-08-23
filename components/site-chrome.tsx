@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { SiteHeader } from "@/components/header";
 import { SiteFooter } from "@/components/footer";
 import { FloatingAI } from "@/components/floating-ai";
-import { AiAssistantFab } from "@/components/ai-assistant-fab";
+import { AdBanner } from "@/components/ad-banner";
 
 export function SiteChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -17,9 +17,17 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
     <div className="relative flex min-h-screen flex-col">
       {!hideChrome && <SiteHeader />}
       <main id="main-content" className="flex-1">{children}</main>
+
+      {/* Ad: أسفل الموقع */}
+      {!isAdmin && <AdBanner placementKey="page-footer" />}
+
       {!hideFooter && <SiteFooter />}
-      {!hideFooter && <FloatingAI />}
-      {!isAdmin && <AiAssistantFab />}
+
+      {/* Ad: شريط مثبت (جوال) */}
+      {!isAdmin && <AdBanner placementKey="sticky-mobile" sticky />}
+
+      {/* Single AI assistant button — floating FAB with popup */}
+      {!isAdmin && <FloatingAI />}
     </div>
   );
 }

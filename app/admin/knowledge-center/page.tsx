@@ -169,7 +169,7 @@ export default function KnowledgeCenterPage() {
                   {audit.map((entry) => (
                     <tr key={entry.id} className="border-b border-border/50 hover:bg-muted/20">
                       <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                        {new Date(entry.timestamp).toLocaleString("ar-IQ")}
+                        {new Date(entry.timestamp).toLocaleString("en-US")}
                       </td>
                       <td className="px-4 py-3 font-medium">{entry.section}</td>
                       <td className="px-4 py-3">

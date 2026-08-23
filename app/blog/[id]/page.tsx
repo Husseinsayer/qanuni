@@ -1,16 +1,19 @@
-import { PageHeader } from "@/components/page-header";
 import { ArticleDetail } from "@/components/article-detail";
-import { articles } from "@/lib/data";
+import { prisma } from "@/lib/prisma";
 import { buildDescription, absoluteUrl } from "@/lib/seo";
 import { getSeoDefaults } from "@/lib/seo-defaults";
+import { JsonLd } from "@/components/json-ld";
 import type { Metadata } from "next";
 
-export function generateStaticParams() {
+export const dynamic = "force-dynamic";
+
+export async function generateStaticParams() {
+  const articles = await prisma.article.findMany({ where: { status: "published" }, select: { id: true } });
   return articles.map((a) => ({ id: a.id }));
 }
 
-export function generateMetadata({ params }: { params: { id: string } }): Metadata {
-  const article = articles.find((a) => a.id === params.id);
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const article = await prisma.article.findUnique({ where: { id: params.id } });
   const seo = getSeoDefaults();
   const title = article ? article.title : "مقال";
   const desc = article ? buildDescription(article.excerpt, seo) : undefined;
@@ -27,6 +30,9 @@ export function generateMetadata({ params }: { params: { id: string } }): Metada
       locale: seo.openGraph.ogLocale,
       type: "article",
       siteName: seo.openGraph.ogSiteName,
+      publishedTime: article?.date || undefined,
+      modifiedTime: article?.updatedAt ? new Date(article.updatedAt).toISOString() : undefined,
+      authors: article?.author ? [article.author] : undefined,
       images: seo.openGraph.facebookImage ? [{ url: seo.openGraph.facebookImage }] : undefined,
     },
     twitter: {
@@ -39,19 +45,18 @@ export function generateMetadata({ params }: { params: { id: string } }): Metada
   };
 }
 
-export default function ArticleDetailPage({ params }: { params: { id: string } }) {
-  const article = articles.find((a) => a.id === params.id);
+export default async function ArticleDetailPage({ params }: { params: { id: string } }) {
+  const article = await prisma.article.findUnique({ where: { id: params.id } });
   return (
     <>
-      <PageHeader
-        eyebrow="المدونة القانونية"
-        title="مقال قانوني"
-        crumbs={[
-          { label: "الرئيسية", href: "/" },
-          { label: "المدونة", href: "/blog" },
-          { label: article?.title ?? "المقال" },
-        ]}
-      />
+      <JsonLd page="blog" context={article ? {
+        id: article.id,
+        title: article.title,
+        description: article.excerpt || article.title,
+        date: article.date || undefined,
+        updatedAt: article.updatedAt ? new Date(article.updatedAt).toISOString() : undefined,
+        author: article.author || undefined,
+      } : undefined} />
       <ArticleDetail id={params.id} />
     </>
   );

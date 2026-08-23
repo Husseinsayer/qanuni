@@ -99,8 +99,10 @@ export default function AdsSettingsPage() {
     { key: "articles", label: "صفحات المقالات" },
     { key: "categories", label: "التصنيفات" },
     { key: "search", label: "نتائج البحث" },
-    { key: "authors", label: "صفحات الكاتب" },
-    { key: "tags", label: "صفحات الوسوم" },
+    { key: "lawyers", label: "المحامون" },
+    { key: "laws", label: "القوانين" },
+    { key: "services", label: "الخدمات" },
+    { key: "contact", label: "اتصل بنا" },
   ];
 
   return (

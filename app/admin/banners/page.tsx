@@ -4,8 +4,6 @@ import { useState } from "react";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -26,7 +24,6 @@ import {
   Monitor,
   Tablet,
   Smartphone,
-  Image as ImageIcon,
 } from "lucide-react";
 
 const GRADIENT_PRESETS = [
@@ -95,7 +92,7 @@ export default function BannersPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<AdminAd>>({});
 
-  const banners = data.ads.filter((a) => a.adType === "custom");
+  const banners = data.ads.filter((a) => a.adType === "custom-gradient" || a.adType === "custom-image");
 
   const startEdit = (ad: AdminAd) => {
     setEditingId(ad.id);
@@ -121,7 +118,7 @@ export default function BannersPage() {
     );
     update("ads", next);
     const entry = pushActivityLog({
-      entity: "banner",
+      entity: "ad",
       entityId: editingId,
       actor: "مدير النظام",
       action: "update",
@@ -145,7 +142,8 @@ export default function BannersPage() {
       id: newId,
       name: "إعلان جديد",
       enabled: true,
-      adType: "custom",
+      adType: "custom-gradient",
+      size: "responsive",
       title: "",
       subtitle: "",
       cta: "",
@@ -160,14 +158,15 @@ export default function BannersPage() {
         languages: [],
         categories: [],
         tags: [],
-        authors: [],
         pageTypes: [],
+        deviceTypes: [],
+        loggedUsers: "all",
       },
-      stats: { impressions: 0, clicks: 0 },
+      stats: { impressions: 0, clicks: 0, ctr: 0 },
     };
     update("ads", [...data.ads, newAd]);
     const entry = pushActivityLog({
-      entity: "banner",
+      entity: "ad",
       entityId: newId,
       actor: "مدير النظام",
       action: "create",
@@ -185,7 +184,7 @@ export default function BannersPage() {
       data.ads.filter((a) => a.id !== id)
     );
     const entry = pushActivityLog({
-      entity: "banner",
+      entity: "ad",
       entityId: id,
       actor: "مدير النظام",
       action: "delete",

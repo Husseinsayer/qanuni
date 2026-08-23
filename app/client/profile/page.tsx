@@ -1,50 +1,64 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { User, Mail, Phone, Save, Check, Lock, Shield } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { User, Mail, Save, Check, Lock, Shield, Calendar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getUserSession, isUserLoggedIn } from "@/lib/user-auth";
 
 export default function ClientProfilePage() {
-  const router = useRouter();
-  const [session, setSession] = useState(getUserSession());
+  const { data: session, status } = useSession();
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [createdAt, setCreatedAt] = useState("");
 
   useEffect(() => {
-    const s = getUserSession();
-    if (!s || s.role === "lawyer") {
-      router.push("/auth/login");
-      return;
-    }
-    setSession(s);
-    setName(s.name);
-    setEmail(s.email);
-  }, [router]);
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/client/profile");
+        if (res.ok) {
+          const data = await res.json();
+          setName(data.user?.name || "");
+          setPhone(data.user?.phone || "");
+          if (data.user?.createdAt) {
+            setCreatedAt(new Date(data.user.createdAt).toLocaleDateString("ar-IQ"));
+          }
+        }
+      } catch {
+        console.error("Failed to fetch profile");
+      }
+    };
+    fetchData();
+  }, []);
 
-  const handleSave = () => {
-    // In a real app, this would update the user's profile via API
-    // For now, show success message
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/client/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, phone }),
+      });
+      if (res.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+      }
+    } catch {
+      console.error("Failed to save");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  if (!session) {
+  if (status === "loading") {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-accent border-t-transparent" />
       </div>
     );
   }
-
-  const roleLabels: Record<string, string> = {
-    user: "مستخدم",
-    visitor: "زائر",
-    lawyer: "محامي",
-  };
 
   return (
     <div className="space-y-8 max-w-3xl">
@@ -53,14 +67,14 @@ export default function ClientProfilePage() {
           <h1 className="text-3xl font-extrabold">الملف الشخصي</h1>
           <p className="mt-1 text-muted-foreground">معلومات حسابك على منصة قانوني</p>
         </div>
-        <Button onClick={handleSave} variant="accent" className="gap-2">
-          {saved ? <><Check className="size-4" /> تم الحفظ</> : <><Save className="size-4" /> حفظ</>}
+        <Button onClick={handleSave} variant="accent" className="gap-2" disabled={saving}>
+          {saved ? <><Check className="size-4" /> تم الحفظ</> : <><Save className="size-4" /> {saving ? "جارٍ الحفظ..." : "حفظ"}</>}
         </Button>
       </div>
 
       {saved && (
         <div className="rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm font-medium text-success">
-          تم حفظ التغييرات ✓
+          تم حفظ التغييرات بنجاح
         </div>
       )}
 
@@ -86,9 +100,18 @@ export default function ClientProfilePage() {
               <label className="mb-1.5 block text-sm font-semibold">البريد الإلكتروني</label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute inset-y-0 right-3 my-auto size-4 text-muted-foreground" />
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-border bg-muted/40 pr-10 pl-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30" />
+                <input type="email" value={session?.user?.email || ""} disabled
+                  className="h-11 w-full rounded-xl border border-border bg-muted/20 pr-10 pl-3 text-sm text-muted-foreground" />
               </div>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold">رقم الهاتف</label>
+            <div className="relative">
+              <Mail className="pointer-events-none absolute inset-y-0 right-3 my-auto size-4 text-muted-foreground" />
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+                placeholder="+964 7xx xxx xxxx"
+                className="h-11 w-full rounded-xl border border-border bg-muted/40 pr-10 pl-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30" />
             </div>
           </div>
         </CardContent>
@@ -108,14 +131,16 @@ export default function ClientProfilePage() {
               <Shield className="size-6 text-accent" />
             </div>
             <div>
-              <p className="font-bold">{roleLabels[session.role] ?? "مستخدم"}</p>
-              <p className="text-sm text-muted-foreground">
-                {session.role === "visitor"
-                  ? "حساب زائر — يمكنك تصفح الموقع والتواصل مع المحامين"
-                  : "حساب مستخدم — يمكنك الاستفادة من جميع خدمات المنصة"}
-              </p>
+              <p className="font-bold">مستخدم</p>
+              <p className="text-sm text-muted-foreground">حساب مستخدم — يمكنك الاستفادة من جميع خدمات المنصة</p>
             </div>
           </div>
+          {createdAt && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+              <Calendar className="size-4" />
+              <span>تاريخ التسجيل: {createdAt}</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -5,12 +5,7 @@ import Script from "next/script";
 import { getAdminData } from "@/lib/admin-data";
 
 export function AdSenseLoader() {
-  const [state, setState] = React.useState<{
-    clientId: string;
-    verification: string;
-    autoAds: string;
-    autoAdsEnabled: boolean;
-  } | null>(null);
+  const [clientId, setClientId] = React.useState<string | null>(null);
   const injected = React.useRef(false);
 
   React.useEffect(() => {
@@ -18,29 +13,30 @@ export function AdSenseLoader() {
     try {
       const data = getAdminData();
       const adsense = data.adsense;
-      if (adsense?.enabled && adsense.publisherId) {
-        setState({
-          clientId: adsense.publisherId,
-          verification: adsense.verificationCode || "",
-          autoAds: adsense.autoAdsCode || "",
-          autoAdsEnabled: adsense.autoAdsEnabled,
-        });
-        injected.current = true;
-        // Inject raw HTML codes into head
-        if (adsense.verificationCode) {
-          const el = document.createElement("div");
-          el.id = "adsense-verification";
-          el.style.display = "none";
-          el.innerHTML = adsense.verificationCode;
-          document.head.appendChild(el);
-        }
-        if (adsense.autoAdsEnabled && adsense.autoAdsCode) {
-          const el = document.createElement("div");
-          el.id = "adsense-auto-ads";
-          el.style.display = "none";
-          el.innerHTML = adsense.autoAdsCode;
-          document.head.appendChild(el);
-        } else if (adsense.autoAdsEnabled) {
+      if (!adsense?.enabled || !adsense.publisherId) return;
+
+      setClientId(adsense.publisherId);
+      injected.current = true;
+
+      // Verification meta tag
+      if (adsense.verificationCode) {
+        const wrapper = document.createElement("div");
+        wrapper.id = "adsense-verification";
+        wrapper.style.display = "none";
+        wrapper.innerHTML = adsense.verificationCode;
+        document.head.appendChild(wrapper);
+      }
+
+      // Auto Ads
+      if (adsense.autoAdsEnabled) {
+        if (adsense.autoAdsCode) {
+          // Custom Auto Ads code provided by admin
+          const wrapper = document.createElement("div");
+          wrapper.id = "adsense-auto-ads";
+          wrapper.style.display = "none";
+          wrapper.innerHTML = adsense.autoAdsCode;
+          document.head.appendChild(wrapper);
+        } else {
           // Fallback: standard auto-ads script
           const s = document.createElement("script");
           s.async = true;
@@ -50,22 +46,21 @@ export function AdSenseLoader() {
         }
       }
     } catch {
-      // ignore
+      // silent
     }
   }, []);
 
-  if (!state?.clientId) return null;
+  // Always load the adsbygoogle client script for manual placements
+  if (!clientId) return null;
 
   return (
     <Script
       id="adsbygoogle-client"
       strategy="afterInteractive"
       async
-      src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${state.clientId}`}
+      src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${clientId}`}
       crossOrigin="anonymous"
-      onError={() => {
-        // Silently fail — admin will see no ads
-      }}
+      onError={() => { /* silent — admin will see no ads */ }}
     />
   );
 }

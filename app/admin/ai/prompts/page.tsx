@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import {
   getSystemPrompts,
   setSystemPrompts,
-  defaultSystemPrompt,
 } from "@/lib/ai/settings-store";
 import type { SystemPrompt } from "@/lib/ai/types";
 import { Plus, Save, Trash2, Edit } from "lucide-react";

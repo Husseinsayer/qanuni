@@ -21,11 +21,11 @@ export function answerLawMetadata(metadata: MetadataMatch, _questionType: Questi
   parts.push("");
 
   parts.push(`**اسم القانون:** ${law.name}`);
-  parts.push(`**عدد المواد:** ${law.articles.toLocaleString("ar-IQ")} مادة`);
+  parts.push(`**عدد المواد:** ${law.articles.toLocaleString("en-US")} مادة`);
   parts.push(`**آخر تحديث:** ${law.updated}`);
   if (law.source) parts.push(`**المصدر:** ${law.source}`);
   parts.push("");
-  parts.push(`قانون **${law.name}** يحتوي على **${law.articles.toLocaleString("ar-IQ")} مادة**،`);
+  parts.push(`قانون **${law.name}** يحتوي على **${law.articles.toLocaleString("en-US")} مادة**،`);
   parts.push(`آخر تحديث له كان في ${law.updated}.`);
   parts.push("");
   parts.push(`---\n*المصدر: ${law.source || "الوقائع العراقية"}*`);

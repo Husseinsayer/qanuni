@@ -4,14 +4,12 @@ import { useState } from "react";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/admin-toast";
 import { useAdminContext } from "../admin-context";
 import { pushActivityLog, type AdminAd, type AdminAdPlacement } from "@/lib/admin-data";
-import { History, RotateCcw, Eye, X } from "lucide-react";
+import { History, RotateCcw, Eye } from "lucide-react";
 
 const ACTION_LABELS: Record<string, string> = {
   create: "إنشاء",
@@ -21,7 +19,7 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 const ENTITY_LABELS: Record<string, string> = {
-  banner: "بنر",
+  ad: "إعلان",
   placement: "مكان إعلان",
   html: "كود HTML",
   adsense: "AdSense",
@@ -48,10 +46,10 @@ export default function ActivityLogPage() {
       return;
     }
     const patch = oldValues as Record<string, unknown>;
-    if (entity === "banner") {
+    if (entity === "ad") {
       const existing = data.ads.find((a) => a.id === entityId);
       if (!existing) {
-        toast.error("البنر غير موجود");
+        toast.error("الإعلان غير موجود");
         return;
       }
       const restored = { ...existing, ...patch } as AdminAd;
@@ -75,7 +73,7 @@ export default function ActivityLogPage() {
       return;
     }
     const entry = pushActivityLog({
-      entity: entity as "banner" | "placement",
+      entity: entity as "ad" | "placement",
       entityId,
       actor: "مدير النظام",
       action: "restore",
@@ -88,7 +86,7 @@ export default function ActivityLogPage() {
 
   const fmtDate = (iso?: string) =>
     iso
-      ? new Date(iso).toLocaleString("ar-IQ", {
+      ? new Date(iso).toLocaleString("en-US", {
           year: "numeric",
           month: "long",
           day: "numeric",

@@ -9,18 +9,29 @@ import { detectCaseType } from "@/lib/ai/rag/search";
 import { getProvider } from "@/lib/ai/providers/base";
 import "@/lib/ai/providers/openai";
 import { defaultAIConfig, defaultBotInstructions as defaultBI } from "@/lib/ai/config";
+import { checkRateLimit, RATE_LIMITS, getRateLimitHeaders } from "@/lib/rate-limit";
 
 type StreamRequest = {
   message: string;
   conversationHistory?: Message[];
   aiConfig?: AIConfig;
-  botInstructions?: BotInstructions;
 };
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown";
+    const rateLimitResult = checkRateLimit(`chat-stream:${ip}`, RATE_LIMITS.chat);
+
+    if (!rateLimitResult.allowed) {
+      return new Response(JSON.stringify({ error: "تم تجاوز حد الطلبات. يرجى الانتظار قليلاً." }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", ...getRateLimitHeaders(rateLimitResult) },
+      });
+    }
+
     const body: StreamRequest = await request.json();
-    const { message, conversationHistory = [], aiConfig, botInstructions } = body;
+    const { message, conversationHistory = [], aiConfig: _aiConfig } = body;
 
     if (!message || typeof message !== "string") {
       return new Response(JSON.stringify({ error: "الرسالة مطلوبة" }), {
@@ -29,8 +40,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    if (message.length > 2000) {
+      return new Response(JSON.stringify({ error: "الرسالة طويلة جداً" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const config: AIConfig = defaultAIConfig; // Server-side only — never accept apiKey from client
-    const instructions: BotInstructions = botInstructions || defaultBI;
+    const instructions: BotInstructions = defaultBI; // Always use server-side defaults
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({

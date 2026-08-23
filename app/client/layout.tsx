@@ -3,27 +3,29 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useSession, signOut } from "next-auth/react";
 import {
   LayoutDashboard, User, LogOut,
   Scale, Menu, X, PanelRightClose, PanelRightOpen,
-  Sun, Moon, Bell,
+  Sun, Moon, Star, Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
-import { isUserLoggedIn, getUserSession, logoutUser } from "@/lib/user-auth";
 
 type NavItem = { label: string; href: string; icon: React.ComponentType<{ className?: string }> };
 
 const navItems: NavItem[] = [
   { label: "لوحة التحكم", href: "/client/dashboard", icon: LayoutDashboard },
+  { label: "الرسائل", href: "/client/messages", icon: Mail },
   { label: "الملف الشخصي", href: "/client/profile", icon: User },
+  { label: "تقييماتي", href: "/client/reviews", icon: Star },
 ];
 
-function ClientSidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: {
+function ClientSidebar({ collapsed, onToggle, mobileOpen, onMobileClose, session }: {
   collapsed: boolean; onToggle: () => void; mobileOpen: boolean; onMobileClose: () => void;
+  session: { name?: string | null };
 }) {
   const pathname = usePathname();
-  const session = getUserSession();
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
@@ -96,33 +98,64 @@ function ClientSidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: {
 }
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
-    const session = getUserSession();
-    if (!session || session.role === "lawyer") {
+    if (status === "loading") return;
+    if (!session) {
       router.push("/auth/login");
+    } else if (session.user?.role === "lawyer") {
+      router.push("/lawyer/dashboard");
     } else {
-      setAuthChecked(true);
+      // Bridge NextAuth session to localStorage for sub-pages that still use getUserSession()
+      const expiry = Date.now() + 1000 * 60 * 60 * 24;
+      const localStorageSession = {
+        userId: session.user.id,
+        name: session.user.name || "",
+        email: session.user.email || "",
+        role: "user" as const,
+        token: crypto.randomUUID(),
+        expiry,
+      };
+      localStorage.setItem("user_session", JSON.stringify(localStorageSession));
+
+      // Also ensure a localStorage account exists for client pages
+      const accountsRaw = localStorage.getItem("user_accounts");
+      const accounts = accountsRaw ? JSON.parse(accountsRaw) : [];
+      const hasAccount = accounts.some((a: { email: string }) => a.email === session.user.email);
+      if (!hasAccount) {
+        accounts.push({
+          id: session.user.id,
+          name: session.user.name || "",
+          email: session.user.email || "",
+          phone: "",
+          passwordHash: "",
+          role: "user",
+          createdAt: new Date().toISOString(),
+        });
+        localStorage.setItem("user_accounts", JSON.stringify(accounts));
+      }
     }
-  }, [router]);
+  }, [session, status, router]);
 
-  const handleLogout = () => {
-    logoutUser();
-    router.push("/");
-  };
-
-  if (!authChecked) return null;
+  if (status === "loading" || !session || session.user?.role === "lawyer") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-accent border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-background" dir="rtl">
       <ClientSidebar
         collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)}
         mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)}
+        session={session.user}
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -133,13 +166,13 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             >
               <Menu className="h-5 w-5" />
             </button>
-            <a href="/" className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-accent">
+            <Link href="/" className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-accent">
               العودة للموقع
-            </a>
+            </Link>
           </div>
 
           <div className="flex items-center gap-2">
-            <button onClick={handleLogout} title="تسجيل الخروج"
+            <button onClick={() => signOut({ callbackUrl: "/" })} title="تسجيل الخروج"
               className="rounded-xl p-2.5 text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
             >
               <LogOut className="h-5 w-5" />

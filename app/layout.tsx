@@ -6,7 +6,9 @@ import { SiteChrome } from "@/components/site-chrome";
 import { AdSenseLoader } from "@/components/adsense-loader";
 import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { AnalyticsJsonLd } from "@/components/analytics-json-ld";
+import { JsonLd } from "@/components/json-ld";
 import { NotificationProvider, ToastContainer } from "@/components/notifications";
+import { SessionProvider } from "@/components/session-provider";
 
 const cairo = Cairo({
   subsets: ["arabic", "latin"],
@@ -27,7 +29,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://iqlegal.example"),
+  metadataBase: new URL("https://qanuni.iq"),
   title: {
     default: "دليلك الذكي للقوانين العراقية والمحامين | منصة قانوني",
     template: "%s | منصة قانوني",
@@ -50,11 +52,53 @@ export const metadata: Metadata = {
       "ابحث في آلاف المواد القانونية، اعثر على أفضل المحامين، واقرأ أحدث المقالات القانونية في مكان واحد.",
     type: "website",
     locale: "ar_IQ",
+    siteName: "منصة قانوني",
+    url: "https://qanuni.iq",
+    images: [
+      {
+        url: "/og-default.png",
+        width: 1200,
+        height: 630,
+        alt: "منصة قانوني — الدليل القانوني العراقي",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "دليلك الذكي للقوانين العراقية والمحامين",
+    description:
+      "ابحث في آلاف المواد القانونية، اعثر على أفضل المحامين، واقرأ أحدث المقالات القانونية.",
+    images: ["/og-default.png"],
+    creator: "@qanuni",
+    site: "@qanuni",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
   alternates: {
+    canonical: "https://qanuni.iq",
     languages: {
       "ar-IQ": "/",
     },
+  },
+  verification: {},
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-touch-icon.png",
+    other: [
+      { rel: "apple-touch-icon", url: "/apple-touch-icon.png", sizes: "180x180" },
+    ],
+  },
+  other: {
+    "theme-color": "#3B82F6",
   },
 };
 
@@ -72,20 +116,23 @@ export default function RootLayout({
         >
           تخطّي إلى المحتوى الرئيسي
         </a>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem={false}
-          disableTransitionOnChange
-        >
-          <NotificationProvider>
-            <SiteChrome>{children}</SiteChrome>
-            <ToastContainer />
-          </NotificationProvider>
-        </ThemeProvider>
+        <SessionProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="light"
+            enableSystem={false}
+            disableTransitionOnChange
+          >
+            <NotificationProvider>
+              <SiteChrome>{children}</SiteChrome>
+              <ToastContainer />
+            </NotificationProvider>
+          </ThemeProvider>
+        </SessionProvider>
         <AdSenseLoader />
         <AnalyticsTracker />
         <AnalyticsJsonLd />
+        <JsonLd page="home" />
       </body>
     </html>
   );

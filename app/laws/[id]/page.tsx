@@ -1,8 +1,9 @@
-import { PageHeader } from "@/components/page-header";
 import { LawDetail } from "@/components/law-detail";
+import { AdBanner } from "@/components/ad-banner";
 import { laws as defaultLaws } from "@/lib/data";
 import { buildDescription, absoluteUrl } from "@/lib/seo";
 import { getSeoDefaults } from "@/lib/seo-defaults";
+import { JsonLd } from "@/components/json-ld";
 import type { Metadata } from "next";
 
 // Generate pages for default laws only (for SEO)
@@ -47,5 +48,21 @@ export function generateMetadata({ params }: { params: { id: string } }): Metada
 }
 
 export default function LawDetailPage({ params }: { params: { id: string } }) {
-  return <LawDetail id={params.id} />;
+  const law = defaultLaws.find((l) => l.id === params.id);
+  const seo = getSeoDefaults();
+  return (
+    <>
+      {/* Ad: أعلى تفاصيل القانون */}
+      <AdBanner placementKey="law-detail-top" />
+      <JsonLd data={{
+        "@context": "https://schema.org",
+        "@type": "Legislation",
+        name: law?.name || "قانون",
+        description: `تصفح مواد ${law?.name || "قانون"} والاطلاع على التشريعات العراقية.`,
+        url: absoluteUrl(`/laws/${params.id}`, seo),
+        legislationCountry: "IQ",
+      }} />
+      <LawDetail id={params.id} />
+    </>
+  );
 }

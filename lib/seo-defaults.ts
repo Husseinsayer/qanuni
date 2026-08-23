@@ -63,7 +63,7 @@ export const seoDefaults: AdminSeo = {
     publisherMeta: "منصة قانوني",
     generatorMeta: "Next.js",
     themeColor: "#3B82F6",
-    metadataBase: "https://iqlegal.example",
+    metadataBase: "https://qanuni.iq",
   },
   openGraph: {
     facebookTitle: "دليلك الذكي للقوانين العراقية والمحامين",

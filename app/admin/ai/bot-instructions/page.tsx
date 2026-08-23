@@ -9,7 +9,7 @@ import {
   setBotInstructions,
 } from "@/lib/ai/settings-store";
 import type { BotInstructions } from "@/lib/ai/types";
-import { Save, Plus, Trash2, Info, AlertTriangle, Scale } from "lucide-react";
+import { Save, Plus, Trash2, Info, Scale } from "lucide-react";
 import { toast } from "@/lib/admin-toast";
 
 const responseStyleOptions = [
@@ -214,7 +214,7 @@ export default function BotInstructionsPage() {
 
           {instructions.showDisclaimer && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-              سيتم عرض النص: "هذه المعلومات لأغراض إرشادية فقط ولا تعتبر استشارة قانونية ملزمة. يرجى استشارة محامٍ مؤهل."
+              سيتم عرض النص: &quot;{(instructions as any).disclaimerText || "these informations are for guidance only and do not constitute a binding legal consultation. Please consult a qualified lawyer."}&quot;
             </div>
           )}
         </CardContent>

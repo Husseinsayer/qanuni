@@ -1,16 +1,25 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { MapPin, Building2, ArrowLeft } from "lucide-react";
 import { SectionTitle, Card } from "@/components/ui/card";
 import { Reveal } from "@/components/reveal";
-import { lawFirms, type LawFirm } from "@/lib/data";
+import { useSiteData } from "@/lib/use-site-data";
 import { cn } from "@/lib/utils";
 
-function FirmCard({ firm }: { firm: LawFirm }) {
+type LawFirmItem = {
+  id: string;
+  name: string;
+  city: string;
+  address: string;
+  hue: string;
+};
+
+function FirmCard({ firm }: { firm: LawFirmItem }) {
   return (
     <Card className="card-hover flex h-full flex-col p-6">
-      <a href={`/law-firms/${firm.id}`} className="flex items-start gap-4">
+      <Link href={`/law-firms/${firm.id}`} className="flex items-start gap-4">
         <span
           className={cn(
             "grid size-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br text-white shadow-soft",
@@ -26,16 +35,16 @@ function FirmCard({ firm }: { firm: LawFirm }) {
           </div>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{firm.address}</p>
         </div>
-      </a>
+      </Link>
 
       <div className="mt-auto pt-6">
-        <a
+        <Link
           href={`/law-firms/${firm.id}`}
           className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent transition hover:bg-accent/20"
         >
           تفاصيل المكتب
           <ArrowLeft className="size-4" />
-        </a>
+        </Link>
       </div>
     </Card>
   );
@@ -43,6 +52,16 @@ function FirmCard({ firm }: { firm: LawFirm }) {
 
 export function LawFirms() {
   const [paused, setPaused] = React.useState(false);
+  const { lawFirms, isLoading } = useSiteData();
+
+  if (isLoading) {
+    return <div className="container py-16 text-center">جاري تحميل مكاتب المحامين...</div>;
+  }
+
+  if (lawFirms.length === 0) {
+    return null;
+  }
+
   const loop = [...lawFirms, ...lawFirms];
 
   return (

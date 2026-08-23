@@ -56,6 +56,14 @@ export type Lawyer = {
   telegram?: string;
   facebook?: string;
   instagram?: string;
+  // Auth / login credentials
+  email?: string;
+  password?: string;
+  photoUrl?: string;
+  // DB reference
+  userId?: string;
+  // Points & rewards
+  points?: number;
   // Promotion system
   promoted?: boolean; // Currently promoted/featured
   promotionStatus?: "none" | "pending" | "approved" | "rejected"; // Promotion request status
@@ -117,7 +125,7 @@ export const lawyers: Lawyer[] = [
     online: true,
     gender: "female",
     languages: ["العربية", "الكردية", "الإنجليزية"],
-    bio: "متخصصة في قضايا الأحوال الشخصية والحضانة وحضانة الأطفال بأسلوب إنساني واحترافي.",
+    bio: "متخصصة في قضايا الأحوال الشخصية والحضانة والنفقة بأسلوب إنساني واحترافي.",
     initials: "سن",
     hue: "from-amber-500 to-orange-600",
     whatsapp: "+9647502223344",
@@ -309,7 +317,7 @@ export const lawyers: Lawyer[] = [
     online: true,
     gender: "male",
     languages: ["العربية", "الإنجليزية"],
-    bio: "خبير في القانون المالي والضرائب والgyاصلات المالية أمام الجهات الحكومية.",
+    bio: "خبير في القانون المالي والضرائب والمعاملات المالية أمام الجهات الحكومية.",
     initials: "عج",
     hue: "from-slate-700 to-slate-900",
     whatsapp: "+9647709990011",
@@ -431,7 +439,7 @@ export const lawyers: Lawyer[] = [
     gender: "male",
     languages: ["العربية", "الإنجليزية", "الفرنسية"],
     bio: "خبير في القانون الدولي الإنساني والمعاملات الدولية والتحكيم التجاري.",
-    initials: "شح",
+    initials: "صح",
     hue: "from-red-500 to-rose-600",
     whatsapp: "+9647829990011",
     telegram: "@lawyer_sadiq",
@@ -471,7 +479,7 @@ export const lawyers: Lawyer[] = [
     gender: "male",
     languages: ["العربية", "الكردية", "الإنجليزية"],
     bio: "مستشار قانوني للشركات متعدد الجنسيات والصفقات التجارية العابرة للحدود.",
-    initials: "бр",
+    initials: "بر",
     hue: "from-slate-700 to-slate-900",
     whatsapp: "+9647512223344",
     telegram: "@lawyer_basel",
@@ -510,7 +518,7 @@ export const lawyers: Lawyer[] = [
     online: true,
     gender: "male",
     languages: ["العربية", "الإنجليزية"],
-    bio: "خبير في القضاء الإداري وطعون الموظفين المنازعات الإدارية أمام محكمة القضاء الإداري.",
+    bio: "خبير في القضاء الإداري وطعون الموظفين والمنازعات الإدارية أمام محكمة القضاء الإداري.",
     initials: "فن",
     hue: "from-emerald-500 to-teal-600",
     whatsapp: "+9647701112244",
@@ -1070,7 +1078,7 @@ export const lawyers: Lawyer[] = [
     online: true,
     gender: "male",
     languages: ["العربية", "الكردية"],
-    bio: "خبير عقاري متخصص في تسجيل الأراضي الزراعية وNTJ منازعات الحدود.",
+    bio: "خبير عقاري متخصص في تسجيل الأراضي الزراعية وحل منازعات الحدود.",
     initials: "زم",
     hue: "from-red-500 to-rose-600",
     whatsapp: "+9647512221133",
@@ -1090,7 +1098,7 @@ export const lawyers: Lawyer[] = [
     online: true,
     gender: "female",
     languages: ["العربية"],
-    bio: "متخصصة في قضايا الحضانة والنفقة والميراث بمنطق إنساني وwaqiعي.",
+    bio: "متخصصة في قضايا الحضانة والنفقة والميراث بمنطق إنساني وواقعي.",
     initials: "شع",
     hue: "from-amber-500 to-orange-600",
     whatsapp: "+9647819998877",
@@ -1109,7 +1117,9 @@ export type Article = {
   readingTime: number;
   hue: string;
   views: number;
-  status?: "draft" | "published";
+  status?: "draft" | "pending" | "published" | "rejected";
+  slug?: string;
+  tags?: string[];
 };
 
 export const articles: Article[] = [
@@ -1333,7 +1343,7 @@ export const lawFirms: LawFirm[] = [
     id: "f-arbil-trust",
     name: "مكتب الأمانة للاستشارات القانونية",
     city: "أربيل",
-    address: "شارع 60 متر — مجمع كوردستان بلaza، الطابق 2",
+    address: "شارع 60 متر — مجمع كوردستان بلازا، الطابق 2",
     phones: ["+964 750 222 3344", "+964 751 555 6677"],
     hue: "from-amber-500 to-orange-600",
     lawyers: [
@@ -1423,7 +1433,7 @@ export const lawFirms: LawFirm[] = [
     id: "f-southern-rights",
     name: "مكتب حقوق الجنوب",
     city: "الناصرية",
-    address: "شارع الحبوبي — بناية הזכויות، الطابق 1",
+    address: "شارع الحبوبي — بناية الحقوق، الطابق 1",
     phones: ["+964 770 333 4455", "+964 782 333 4455"],
     hue: "from-teal-500 to-emerald-600",
     lawyers: [
@@ -1434,7 +1444,7 @@ export const lawFirms: LawFirm[] = [
   },
   {
     id: "f-baghdad-legal-center",
-    name: "المركز القانوني Baghdadi",
+    name: "المركز القانوني بغدادي",
     city: "بغداد",
     address: "شارع أبو نؤاس — مجمع الحمراء، الطابق 8",
     phones: ["+964 770 111 2244", "+964 781 777 8899"],
@@ -1452,9 +1462,11 @@ export const lawFirms: LawFirm[] = [
 export const navLinks = [
   { label: "الرئيسية", href: "/" },
   { label: "القوانين العراقية", href: "/laws" },
-  { label: "الخدمات", href: "/#services" },
+  { label: "الخدمات", href: "/services" },
   { label: "دليل المحامين", href: "/lawyers" },
+  { label: "أفضل 100 محامي", href: "/top-lawyers" },
   { label: "مكاتب المحامين", href: "/law-firms" },
+  { label: "المدونة", href: "/blog" },
 ];
 
 // ===== Sample articles per law (real-shaped Iraqi legal content) =====
@@ -1576,3 +1588,17 @@ export const articleBodies: Record<string, ArticleBlock[]> = {
     { h: "ثالثاً: الفحوصات العلمية", p: "يجوز اللجوء إلى فحوصات DNA عند النزاع، وتُعد نتائجها قرينة قوية يعتد بها القاضي، خاصة في قضايا اللعان والانتفاء، مع مراعاة مصلحة المحضون الفضلى." },
   ],
 };
+
+/** HTML content for articles — richer version of articleBodies for the new BlogEditor */
+function blocksToHtml(blocks: ArticleBlock[]): string {
+  return blocks.map((b) => {
+    let html = "";
+    if (b.h) html += `<h2>${b.h}</h2>`;
+    html += `<p>${b.p}</p>`;
+    return html;
+  }).join("\n");
+}
+
+export const articleHtml: Record<string, string> = Object.fromEntries(
+  Object.entries(articleBodies).map(([id, blocks]) => [id, blocksToHtml(blocks)])
+);

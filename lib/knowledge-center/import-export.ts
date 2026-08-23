@@ -1,6 +1,6 @@
 // ===== Knowledge Center - Import/Export Utilities =====
 
-import type { KnowledgeSection, KnowledgeCenterData } from "./types";
+import type { KnowledgeSection } from "./types";
 import { getKnowledgeData, saveKnowledgeData } from "./store";
 
 // === Export to JSON ===

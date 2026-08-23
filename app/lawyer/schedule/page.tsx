@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Save, Check, Clock, Calendar, Sun, Moon } from "lucide-react";
+import { Save, Check, Clock, Calendar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -10,7 +9,6 @@ import {
   getMyWorkingHours, updateWorkingHours,
   seedLawyerDemoData, type WorkingHours, type DayHours,
 } from "@/lib/lawyer-profiles";
-import { getUserSession } from "@/lib/user-auth";
 
 const dayNames: Record<keyof WorkingHours, string> = {
   saturday: "السبت",
@@ -36,16 +34,13 @@ function emptyHours(): WorkingHours {
 }
 
 export default function SchedulePage() {
-  const router = useRouter();
   const [hours, setHours] = useState<WorkingHours>(emptyHours());
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const s = getUserSession();
-    if (!s || s.role !== "lawyer") { router.push("/auth/login"); return; }
     seedLawyerDemoData();
     setHours(getMyWorkingHours());
-  }, [router]);
+  }, []);
 
   const updateDay = (day: keyof WorkingHours, field: keyof DayHours, value: boolean | string) => {
     setHours((prev) => ({

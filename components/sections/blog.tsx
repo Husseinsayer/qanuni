@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { ArrowLeft, Clock, UserRound } from "lucide-react";
 import { SectionTitle, Card, Badge } from "@/components/ui/card";
-import { Reveal, fadeUp, staggerContainer } from "@/components/reveal";
-import { articles } from "@/lib/data";
+import { Reveal } from "@/components/reveal";
+import { useSiteData } from "@/lib/use-site-data";
+import { lawyers, lawyerSlug, type Lawyer } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { AdBanner } from "@/components/ad-banner";
 
@@ -19,6 +21,16 @@ function formatDate(iso: string) {
 }
 
 export function BlogSection() {
+  const { articles, isLoading } = useSiteData();
+
+  if (isLoading) {
+    return <div className="container py-16 text-center">جاري تحميل المقالات...</div>;
+  }
+
+  if (articles.length === 0) {
+    return null;
+  }
+
   return (
     <section id="blog" className="scroll-mt-20 bg-muted/30 py-16 md:py-24">
       <div className="container">
@@ -29,7 +41,7 @@ export function BlogSection() {
         />
 
         <div
-          className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4"
+          className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3"
           // stagger via Reveal wrapper below
         >
           {articles.map((a, i) => (
@@ -51,17 +63,28 @@ export function BlogSection() {
                       </span>
                       <span>{formatDate(a.date)}</span>
                     </div>
-                    <a href={`/blog/${a.id}`}>
+                    <Link href={`/blog/${a.id}`}>
                       <h3 className="line-clamp-2 text-base font-bold leading-snug group-hover:text-accent">
                         {a.title}
                       </h3>
-                    </a>
+                    </Link>
                     <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{a.excerpt}</p>
                     <div className="mt-4 flex items-center gap-2 border-t border-border pt-4">
-                      <span className="grid size-7 place-items-center rounded-full bg-muted text-xs font-bold">
-                        <UserRound className="size-4" />
-                      </span>
-                      <span className="text-xs font-medium">{a.author}</span>
+                      {a.lawyerId ? (
+                        <Link href={`/lawyers/${lawyerSlug(lawyers.find((l) => l.id === a.lawyerId) || { slug: a.lawyerId } as Lawyer)}`} className="flex items-center gap-2 transition hover:text-accent">
+                          <span className="grid size-7 place-items-center rounded-full bg-accent/10 text-xs font-bold text-accent">
+                            <UserRound className="size-4" />
+                          </span>
+                          <span className="text-xs font-semibold">{a.author}</span>
+                        </Link>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <span className="grid size-7 place-items-center rounded-full bg-muted text-xs font-bold">
+                            <UserRound className="size-4" />
+                          </span>
+                          <span className="text-xs font-medium">{a.author}</span>
+                        </span>
+                      )}
                     </div>
                     <a
                       href={`/blog/${a.id}`}
@@ -75,7 +98,7 @@ export function BlogSection() {
               </Reveal>
               {i === 1 && (
                 <div className="col-span-full">
-                  <AdBanner size="rectangle" placementKey="in-article-2" />
+                  <AdBanner placementKey="blog-inline" />
                 </div>
               )}
             </React.Fragment>

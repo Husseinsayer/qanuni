@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Facebook, Twitter, Instagram, Linkedin, Youtube, Send, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useSiteData } from "@/lib/use-site-data";
 
 const legalLinks = [
   { label: "سياسة الخصوصية", href: "/legal/privacy" },
@@ -11,17 +12,17 @@ const legalLinks = [
   { label: "ملفات تعريف الارتباط", href: "/legal/privacy" },
 ];
 
-const socials: { Icon: React.ComponentType<{ className?: string }>; href: string; label: string }[] = [
-  { Icon: Facebook, href: "https://facebook.com/iqlegal", label: "فيسبوك" },
-  { Icon: Twitter, href: "https://twitter.com/iqlegal", label: "إكس" },
-  { Icon: Instagram, href: "https://instagram.com/iqlegal", label: "إنستغرام" },
-  { Icon: Linkedin, href: "https://linkedin.com/company/iqlegal", label: "لينكدإن" },
-  { Icon: Youtube, href: "https://youtube.com/@iqlegal", label: "يوتيوب" },
-];
-
 export function SiteFooter() {
   const [email, setEmail] = React.useState("");
   const [done, setDone] = React.useState(false);
+  const { footer: footerData, logo, siteName } = useSiteData();
+  const socialsData: Record<string, string> = React.useMemo(() => {
+    if (!footerData.socials) return {};
+    if (typeof footerData.socials === "string") {
+      try { return JSON.parse(footerData.socials); } catch { return {}; }
+    }
+    return footerData.socials as Record<string, string>;
+  }, [footerData.socials]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,14 +39,20 @@ export function SiteFooter() {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-3">
-              <img src="/logo.png" alt="قانوني" loading="lazy" className="size-10 rounded-xl object-contain" />
-              <span className="text-xl font-extrabold">قانوني</span>
+              <img src={logo || "/qanuni/logo.png"} alt={siteName || "قانوني"} loading="lazy" className="size-10 rounded-xl object-contain" />
+              <span className="text-xl font-extrabold">{siteName || "قانوني"}</span>
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/70">
-              منصة عراقية موثوقة تجمع القوانين والمحامين والمعرفة القانونية في مكان واحد، لخدمة المواطن العراقي بكل ثقة.
+              {footerData.description || "منصة عراقية موثوقة تجمع القوانين والمحامين والمعرفة القانونية في مكان واحد، لخدمة المواطن العراقي بكل ثقة."}
             </p>
             <div className="mt-5 flex gap-2">
-              {socials.map(({ Icon, href, label }, i) => (
+              {[
+                { Icon: Facebook, href: socialsData.facebook, label: "فيسبوك" },
+                { Icon: Twitter, href: socialsData.twitter, label: "إكس" },
+                { Icon: Instagram, href: socialsData.instagram, label: "إنستغرام" },
+                { Icon: Linkedin, href: socialsData.linkedin, label: "لينكدإن" },
+                { Icon: Youtube, href: socialsData.youtube, label: "يوتيوب" },
+              ].filter(s => s.href).map(({ Icon, href, label }, i) => (
                 <a
                   key={i}
                   href={href}
@@ -68,13 +75,14 @@ export function SiteFooter() {
                 { label: "الرئيسية", href: "/" },
                 { label: "القوانين العراقية", href: "/laws" },
                 { label: "دليل المحامين", href: "/lawyers" },
+                { label: "أفضل 100 محامي", href: "/top-lawyers" },
                 { label: "مكاتب المحامين", href: "/law-firms" },
                 { label: "الخدمات", href: "/services" },
               ].map((l) => (
                 <li key={l.href}>
-                  <a href={l.href} className="text-sm text-white/70 transition hover:text-gold">
+                  <Link href={l.href} className="text-sm text-white/70 transition hover:text-gold">
                     {l.label}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -86,9 +94,9 @@ export function SiteFooter() {
             <ul className="space-y-2.5">
               {legalLinks.map((l) => (
                 <li key={l.label}>
-                  <a href={l.href} className="text-sm text-white/70 transition hover:text-gold">
+                  <Link href={l.href} className="text-sm text-white/70 transition hover:text-gold">
                     {l.label}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>

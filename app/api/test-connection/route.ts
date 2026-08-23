@@ -1,7 +1,11 @@
 // ===== Test AI Connection API Route (server-side proxy) =====
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/api-auth";
 
 export async function POST(request: NextRequest) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   try {
     const body = await request.json();
     const { apiKey, model, provider } = body;

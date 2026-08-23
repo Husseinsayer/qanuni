@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
+import { useSession, signOut } from "next-auth/react";
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
 import {
   Menu,
@@ -13,42 +14,33 @@ import {
   LogOut,
   User,
   ChevronDown,
-  Scale,
   FileText,
-  Settings,
   HelpCircle,
-  Headphones,
-  Phone,
 } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { navLinks } from "@/lib/data";
-import { isUserLoggedIn, getUserSession, logoutUser } from "@/lib/user-auth";
-import { NotificationBell } from "@/components/notifications";
+
+import { useSiteData } from "@/lib/use-site-data";
 
 export function SiteHeader() {
   const router = useRouter();
   const { theme, setTheme, resolvedTheme } = useTheme();
+  const { data: session, status } = useSession();
+  const { logo, siteName, registrationEnabled } = useSiteData();
   const [mounted, setMounted] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
-  const [loggedIn, setLoggedIn] = React.useState(false);
-  const [userName, setUserName] = React.useState("");
-  const [userRole, setUserRole] = React.useState<string>("");
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
-  const checkAuth = React.useCallback(() => {
-    setLoggedIn(isUserLoggedIn());
-    const session = getUserSession();
-    setUserName(session?.name ?? "");
-    setUserRole(session?.role ?? "");
-  }, []);
+  const loggedIn = status === "authenticated" && !!session?.user;
+  const userName = (session?.user as any)?.name ?? "";
+  const userRole = (session?.user as any)?.role ?? "";
 
   React.useEffect(() => {
     setMounted(true);
-    checkAuth();
-  }, [checkAuth]);
+  }, []);
 
   // Close dropdown on outside click
   React.useEffect(() => {
@@ -66,15 +58,13 @@ export function SiteHeader() {
 
   const isDark = mounted ? (resolvedTheme ?? theme) === "dark" : false;
 
-  const handleLogout = () => {
-    logoutUser();
-    setLoggedIn(false);
-    setUserName("");
+  const handleLogout = async () => {
     setDropdownOpen(false);
+    await signOut({ redirect: false });
     router.push("/");
   };
 
-  const dashboardUrl = userRole === "lawyer" ? "/lawyer/dashboard" : "/client/dashboard";
+  const dashboardUrl = userRole === "admin" ? "/admin" : userRole === "lawyer" ? "/lawyer/dashboard" : "/client/dashboard";
 
   return (
     <header
@@ -85,40 +75,30 @@ export function SiteHeader() {
     >
       <div className="container flex h-16 items-center justify-between gap-4">
         {/* Logo (right / RTL start) */}
-        <a href="/" className="flex items-center gap-3">
-          <img src="/logo.png" alt="قانوني" loading="lazy" className="size-10 rounded-xl object-contain" />
+        <Link href="/" className="flex shrink-0 items-center gap-3 overflow-hidden">
+          <img src={logo || "/qanuni/logo.png"} alt={siteName || "قانوني"} loading="lazy" className="size-10 rounded-xl object-contain" />
           <span className="flex flex-col leading-none">
-            <span className="text-lg font-extrabold tracking-tight">قانوني</span>
+            <span className="text-lg font-extrabold tracking-tight">{siteName || "قانوني"}</span>
             <span className="text-[11px] text-muted-foreground">الدليل القانوني العراقي</span>
           </span>
-        </a>
+        </Link>
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-1 lg:flex">
           {navLinks.map((link) => (
-            <a
+            <Link
               key={link.href}
               href={link.href}
               className="rounded-lg px-3 py-2 text-sm font-semibold text-foreground/80 transition-colors hover:text-accent"
             >
               {link.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
         {/* Right cluster (left / RTL end) */}
         <div className="flex items-center gap-2">
-          {/* زر طلب الخدمة */}
-          <a
-            href="/contact"
-            className="hidden items-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-white transition-all hover:bg-accent/90 hover:shadow-lg sm:flex"
-          >
-            <Headphones className="size-4" />
-            <span>اطلب خدمة</span>
-          </a>
-
-          {/* جرس الإشعارات */}
-          <NotificationBell />
+          {/* تم حذف زر طلب الخدمة وجرس الإشعارات بناءً على طلب المستخدم */}
 
           <button
             aria-label="تبديل الوضع الداكن"
@@ -164,30 +144,30 @@ export function SiteHeader() {
                         <p className="text-xs text-muted-foreground capitalize">{userRole === "lawyer" ? "محامٍ" : "مستخدم"}</p>
                       </div>
 
-                      <a
+                      <Link
                         href={dashboardUrl}
                         onClick={() => setDropdownOpen(false)}
                         className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold transition hover:bg-accent/10 hover:text-accent"
                       >
                         <LayoutDashboard className="size-4" />
-                        {userRole === "lawyer" ? "لوحة المحامي" : "حسابي"}
-                      </a>
-                      <a
+                        {userRole === "admin" ? "لوحة التحكم" : userRole === "lawyer" ? "لوحة المحامي" : "حسابي"}
+                      </Link>
+                      <Link
                         href="/lawyers"
                         onClick={() => setDropdownOpen(false)}
                         className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold transition hover:bg-accent/10 hover:text-accent"
                       >
                         <FileText className="size-4" />
                         دليل المحامين
-                      </a>
-                      <a
+                      </Link>
+                      <Link
                         href="/contact"
                         onClick={() => setDropdownOpen(false)}
                         className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold transition hover:bg-accent/10 hover:text-accent"
                       >
                         <HelpCircle className="size-4" />
                         مساعدة
-                      </a>
+                      </Link>
                       <div className="mt-1 border-t border-border pt-1">
                         <button
                           onClick={handleLogout}
@@ -225,22 +205,24 @@ export function SiteHeader() {
                         transition={{ duration: 0.15 }}
                         className="absolute left-0 top-full mt-2 w-48 origin-top-left overflow-hidden rounded-2xl border border-border bg-card p-1.5 shadow-premium"
                       >
-                        <a
+                        <Link
                           href="/auth/login"
                           onClick={() => setDropdownOpen(false)}
                           className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold transition hover:bg-accent/10 hover:text-accent"
                         >
                           <LogOut className="size-4" />
                           تسجيل الدخول
-                        </a>
-                        <a
-                          href="/auth/register"
-                          onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 rounded-xl bg-accent/10 px-3 py-2.5 text-sm font-semibold text-accent transition hover:bg-accent/20"
-                        >
-                          <User className="size-4" />
-                          إنشاء حساب
-                        </a>
+                        </Link>
+                        {registrationEnabled !== false && (
+                          <Link
+                            href="/auth/register"
+                            onClick={() => setDropdownOpen(false)}
+                            className="flex items-center gap-2.5 rounded-xl bg-accent/10 px-3 py-2.5 text-sm font-semibold text-accent transition hover:bg-accent/20"
+                          >
+                            <User className="size-4" />
+                            إنشاء حساب
+                          </Link>
+                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -253,7 +235,7 @@ export function SiteHeader() {
           <button
             aria-label="القائمة"
             onClick={() => setMobileOpen(true)}
-            className="grid size-10 place-items-center rounded-xl border border-border lg:hidden"
+            className="relative z-10 grid size-10 shrink-0 place-items-center rounded-xl border border-border lg:hidden"
           >
             <Menu className="size-5" />
           </button>
@@ -282,7 +264,7 @@ export function SiteHeader() {
             >
               <div className="mb-6 flex items-center justify-between">
                 <span className="flex items-center gap-2 font-extrabold">
-                  <img src="/logo.png" alt="قانوني" loading="lazy" className="size-6 rounded-lg object-contain" /> قانوني
+                  <img src={logo || "/qanuni/logo.png"} alt={siteName || "قانوني"} loading="lazy" className="size-6 rounded-lg object-contain" /> {siteName || "قانوني"}
                 </span>
                 <button
                   aria-label="إغلاق"
@@ -295,38 +277,30 @@ export function SiteHeader() {
 
               <nav className="flex flex-col gap-1">
                 {navLinks.map((link) => (
-                  <a
+                  <Link
                     key={link.href}
                     href={link.href}
                     onClick={() => setMobileOpen(false)}
                     className="rounded-lg px-3 py-3 text-base font-semibold transition hover:bg-muted/60 hover:text-accent"
                   >
                     {link.label}
-                  </a>
+                  </Link>
                 ))}
               </nav>
 
               <div className="mt-auto flex flex-col gap-2 pt-6">
-                {/* زر طلب الخدمة - الجوال */}
-                <a
-                  href="/contact"
-                  onClick={() => setMobileOpen(false)}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-bold text-white transition hover:bg-accent/90"
-                >
-                  <Headphones className="size-5" />
-                  اطلب خدمة
-                </a>
+                {/* تم حذف زر طلب الخدمة من الجوال */}
 
                 {loggedIn ? (
                   <>
-                    <a
+                    <Link
                       href={dashboardUrl}
                       onClick={() => setMobileOpen(false)}
                       className="flex items-center gap-2 rounded-lg px-3 py-3 text-base font-semibold text-accent transition hover:bg-muted/60"
                     >
                       <LayoutDashboard className="size-5" />
                       {userRole === "lawyer" ? "لوحة المحامي" : "حسابي"}
-                    </a>
+                    </Link>
                     <button
                       onClick={() => { handleLogout(); setMobileOpen(false); }}
                       className="flex items-center gap-2 rounded-lg px-3 py-3 text-base font-semibold text-danger transition hover:bg-muted/60"
@@ -340,21 +314,23 @@ export function SiteHeader() {
                   </>
                 ) : (
                   <div className="flex flex-col gap-2">
-                    <a
+                    <Link
                       href="/auth/login"
                       onClick={() => setMobileOpen(false)}
                       className="flex items-center gap-2 rounded-lg px-3 py-3 text-base font-semibold transition hover:bg-muted/60 hover:text-accent"
                     >
                       <LogOut className="size-5" />
                       تسجيل الدخول
-                    </a>
-                    <a
-                      href="/auth/register"
-                      onClick={() => setMobileOpen(false)}
-                      className="rounded-xl bg-accent px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-accent/90"
-                    >
-                      إنشاء حساب
-                    </a>
+                    </Link>
+                    {registrationEnabled !== false && (
+                      <Link
+                        href="/auth/register"
+                        onClick={() => setMobileOpen(false)}
+                        className="rounded-xl bg-accent px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-accent/90"
+                      >
+                        إنشاء حساب
+                      </Link>
+                    )}
                   </div>
                 )}
               </div>

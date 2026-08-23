@@ -1,23 +1,40 @@
+import Link from "next/link";
 import { Reveal } from "@/components/reveal";
-import { SectionTitle, Card } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { lawFirms } from "@/lib/data";
 import { Building2, MapPin, Users, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { JsonLd } from "@/components/json-ld";
+import { AdBanner } from "@/components/ad-banner";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "مكاتب المحامين",
+  description: "تصفح جميع مكاتب المحامين المعتمدة في العراق — بغداد، البصرة، أربيل، والموصل.",
+  openGraph: {
+    title: "مكاتب المحامين — منصة قانوني",
+    description: "تصفح جميع مكاتب المحامين المعتمدة في العراق.",
+    type: "website",
+    locale: "ar_IQ",
+    siteName: "منصة قانوني",
+  },
+  alternates: {
+    canonical: "https://qanuni.iq/law-firms",
+  },
+};
 
 export default function LawFirmsPage() {
   return (
     <>
+      <JsonLd page="law-firms" context={{ count: lawFirms.length, firms: lawFirms }} />
+      {/* Ad: أعلى المكاتب */}
+      <AdBanner placementKey="law-firms-top" />
       <section className="py-12">
         <div className="container">
-          <SectionTitle
-            eyebrow="مكاتب المحامين"
-            title="جميع المكاتب"
-            subtitle="تصفح مكاتب المحامين المعتمدة في العراق"
-          />
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
             {lawFirms.map((firm, i) => (
               <Reveal key={firm.id} delay={i * 0.05}>
-                <a href={`/law-firms/${firm.id}`}>
+                <Link href={`/law-firms/${firm.id}`}>
                   <Card className="card-hover flex h-full flex-col p-6">
                     <div className="flex items-start gap-4">
                       <span
@@ -41,7 +58,7 @@ export default function LawFirmsPage() {
                       <ArrowLeft className="size-4" />
                     </div>
                   </Card>
-                </a>
+                </Link>
               </Reveal>
             ))}
           </div>

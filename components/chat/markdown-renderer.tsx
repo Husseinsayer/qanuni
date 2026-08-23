@@ -39,7 +39,7 @@ function renderMarkdown(text: string): string {
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
 
   // Code blocks
-  html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
+  html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, _lang, code) => {
     return `<pre class="bg-muted rounded-xl p-4 overflow-x-auto"><code class="text-sm">${code.trim()}</code></pre>`;
   });
 

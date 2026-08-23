@@ -17,11 +17,27 @@ export default function ForgotPasswordPage() {
     setError("");
     setLoading(true);
 
-    // Simulate password reset (no backend in current MVP)
-    await new Promise((r) => setTimeout(r, 1000));
-
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       setError("يرجى إدخال بريد إلكتروني صحيح");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "حدث خطأ");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError("حدث خطأ في الاتصال بالخادم");
       setLoading(false);
       return;
     }

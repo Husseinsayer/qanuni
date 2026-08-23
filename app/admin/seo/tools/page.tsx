@@ -8,13 +8,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ToastProvider } from "@/components/ui/toast";
 import { toast } from "@/lib/admin-toast";
 import { useAdminContext } from "../../admin-context";
 import { pushActivityLog } from "@/lib/admin-data";
-import { Plus, Trash2, ArrowRightLeft, Bot, X } from "lucide-react";
+import { Plus, Trash2, ArrowRightLeft, Bot } from "lucide-react";
 
-function Banner({ children }: { children?: React.ReactNode }) {
+function Banner({ children: _ }: { children?: React.ReactNode }) {
   return (
     <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/30 dark:bg-amber-900/20 dark:text-amber-200">
       ⚠️ يتطلب هذا القسم خادماً (API/Route Handler) لتطبيقه فعلياً على الطلبات. الإعدادات تُحفظ الآن؛ الربط بـ middleware قادم.

@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAdminTable } from "@/lib/use-admin-table";
 import { addItem, updateItem, softDeleteItem, restoreItem, getItems } from "@/lib/knowledge-center/store";
-import { type LegalProcedure, type ProcedureStep, PROCEDURE_CATEGORIES, GOVERNORATES } from "@/lib/knowledge-center/types";
+import { type LegalProcedure, PROCEDURE_CATEGORIES, GOVERNORATES } from "@/lib/knowledge-center/types";
 import { Plus, Pencil, Trash2, X, Search, ChevronRight, ChevronLeft, RotateCcw, Archive, GripVertical, Download, Upload, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "@/lib/admin-toast";
-import { exportSectionToJSON, exportSectionToCSV, importFromJSON, readFileAsText } from "@/lib/knowledge-center/import-export";
+import { exportSectionToJSON, importFromJSON, readFileAsText } from "@/lib/knowledge-center/import-export";
 
 const emptyForm: Omit<LegalProcedure, "id" | "createdAt" | "updatedAt" | "deletedAt"> = {
   name: "",

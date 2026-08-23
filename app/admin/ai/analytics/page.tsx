@@ -4,9 +4,8 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getConversations } from "@/lib/ai/settings-store";
-import type { Conversation, CaseType } from "@/lib/ai/types";
+import type { Conversation } from "@/lib/ai/types";
 import {
-  BarChart3,
   MessageSquare,
   Users,
   Clock,

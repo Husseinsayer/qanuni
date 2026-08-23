@@ -1,6 +1,5 @@
 // ===== Iraqi Legal Assistant - Answer Validator =====
 import type {
-  Message,
   LawReference,
   ConfidenceScore,
 } from "../types";
@@ -91,7 +90,7 @@ export function validateAnswer(
     else if (error.severity === "medium") score -= 15;
     else score -= 5;
   }
-  for (const warning of warnings) {
+  for (const _warning of warnings) {
     score -= 5;
   }
   score = Math.max(0, score);

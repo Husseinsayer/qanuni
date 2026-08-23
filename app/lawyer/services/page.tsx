@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Plus, X, Save, Check, Edit3, DollarSign, Clock, Globe, Trash2 } from "lucide-react";
+import { Plus, Save, Check, Edit3, DollarSign, Clock, Globe, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -10,10 +9,8 @@ import {
   getMyServices, addService, removeService, updateService,
   seedLawyerDemoData, type LawyerService,
 } from "@/lib/lawyer-profiles";
-import { getUserSession } from "@/lib/user-auth";
 
 export default function ServicesPage() {
-  const router = useRouter();
   const [services, setServices] = useState<LawyerService[]>([]);
   const [saved, setSaved] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -21,11 +18,9 @@ export default function ServicesPage() {
   const [newForm, setNewForm] = useState({ name: "", description: "", price: 50, duration: "30 دقيقة", online: true });
 
   useEffect(() => {
-    const s = getUserSession();
-    if (!s || s.role !== "lawyer") { router.push("/auth/login"); return; }
     seedLawyerDemoData();
     setServices(getMyServices());
-  }, [router]);
+  }, []);
 
   const handleDelete = (id: string) => {
     removeService(id);

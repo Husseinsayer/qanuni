@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getAnswerSettings, setAnswerSettings } from "@/lib/ai/settings-store";
 import type { AnswerSettings } from "@/lib/ai/types";
-import { Save, Eye, EyeOff } from "lucide-react";
+import { Save, Eye } from "lucide-react";
 import { toast } from "@/lib/admin-toast";
 
 export default function AnswerSettingsPage() {

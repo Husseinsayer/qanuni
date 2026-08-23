@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAdminContext } from "../admin-context";
@@ -17,6 +17,11 @@ import {
   Shield,
   UserCheck,
   UserX,
+  Eye,
+  CheckCircle,
+  XCircle,
+  Clock,
+  RefreshCw,
 } from "lucide-react";
 import { useAdminTable } from "@/lib/use-admin-table";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -34,27 +39,109 @@ const allPermissions: { key: string; label: string }[] = [
 
 const defaultRoleIds = ["admin", "editor", "viewer"];
 
+const statusConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
+  pending: { label: "قيد المراجعة", color: "bg-amber-500/10 text-amber-600 dark:text-amber-400", icon: Clock },
+  approved: { label: "تمت الموافقة", color: "bg-green-500/10 text-green-600 dark:text-green-400", icon: CheckCircle },
+  rejected: { label: "مرفوض", color: "bg-red-500/10 text-red-600 dark:text-red-400", icon: XCircle },
+};
+
 export default function UsersAdminPage() {
   const { data, update } = useAdminContext();
   const [activeTab, setActiveTab] = useState<"users" | "roles">("users");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
 
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [userForm, setUserForm] = useState({
     name: "",
     email: "",
+    phone: "",
     role: "",
     active: true,
   });
   const [deleteUserConfirm, setDeleteUserConfirm] = useState<string | null>(null);
+
+  const [detailModalUser, setDetailModalUser] = useState<AdminUser | null>(null);
 
   const [roleModalOpen, setRoleModalOpen] = useState(false);
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [roleForm, setRoleForm] = useState({ name: "", permissions: [] as string[] });
   const [deleteRoleConfirm, setDeleteRoleConfirm] = useState<string | null>(null);
 
+  // Fetch real users from database
+  const [dbUsers, setDbUsers] = useState<AdminUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+
+  const fetchDbUsers = useCallback(async () => {
+    setLoadingUsers(true);
+    try {
+      const res = await fetch("/api/admin/users");
+      if (res.ok) {
+        const { users } = await res.json();
+        const mapped: AdminUser[] = users.map((u: any) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          phone: u.phone || "",
+          role: u.role,
+          active: u.isActive,
+          createdAt: u.createdAt?.split("T")[0] || "",
+          lastLogin: u.lastLoginAt?.split("T")[0] || undefined,
+          status: u.status || "approved",
+        }));
+        setDbUsers(mapped);
+      }
+    } catch {
+      console.error("Failed to fetch users");
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDbUsers();
+  }, [fetchDbUsers]);
+
+  const allUsers = [...dbUsers, ...data.users.filter((u) => !dbUsers.some((d) => d.id === u.id || d.email === u.email))];
+
+  const handleApproveUser = async (userId: string) => {
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, action: "approve" }),
+      });
+      if (res.ok) {
+        setDbUsers((prev) => prev.map((u) => u.id === userId ? { ...u, status: "approved", active: true } : u));
+        toast.success("تمت الموافقة على المستخدم");
+      }
+    } catch {
+      toast.error("حدث خطأ");
+    }
+  };
+
+  const handleRejectUser = async (userId: string) => {
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, action: "reject" }),
+      });
+      if (res.ok) {
+        setDbUsers((prev) => prev.map((u) => u.id === userId ? { ...u, status: "rejected", active: false } : u));
+        toast.warning("تم رفض المستخدم");
+      }
+    } catch {
+      toast.error("حدث خطأ");
+    }
+  };
+
+  const filteredUsers = statusFilter === "all"
+    ? allUsers
+    : allUsers.filter((u) => (u.status || "approved") === statusFilter);
+
   const { search, setSearch, page, setPage, pageSize, setPageSize, paged, totalPages, total } =
-    useAdminTable(data.users, ["name", "email"]);
+    useAdminTable(filteredUsers, ["name", "email"]);
 
   const getRoleName = (roleId: string) => data.roles.find((r) => r.id === roleId)?.name || roleId;
 
@@ -65,13 +152,13 @@ export default function UsersAdminPage() {
   };
 
   const openAddUser = () => {
-    setUserForm({ name: "", email: "", role: data.roles[0]?.id || "", active: true });
+    setUserForm({ name: "", email: "", phone: "", role: data.roles[0]?.id || "", active: true });
     setEditingUserId(null);
     setUserModalOpen(true);
   };
 
   const openEditUser = (user: AdminUser) => {
-    setUserForm({ name: user.name, email: user.email, role: user.role, active: user.active });
+    setUserForm({ name: user.name, email: user.email, phone: user.phone || "", role: user.role, active: user.active });
     setEditingUserId(user.id);
     setUserModalOpen(true);
   };
@@ -89,12 +176,14 @@ export default function UsersAdminPage() {
         id: `u${Date.now()}`,
         name: userForm.name,
         email: userForm.email,
+        phone: userForm.phone,
         role: userForm.role,
         active: userForm.active,
         createdAt: new Date().toISOString().split("T")[0],
+        status: "pending",
       };
       update("users", [...data.users, newUser]);
-      toast.success("تم الحفظ بنجاح", `تمت إضافة المستخدم "${userForm.name}"`);
+      toast.success("تمت الإضافة بنجاح", `تمت إضافة المستخدم "${userForm.name}" — بانتظار المراجعة والموافقة`);
     }
     setUserModalOpen(false);
   };
@@ -111,6 +200,27 @@ export default function UsersAdminPage() {
       "users",
       data.users.map((u) => (u.id === id ? { ...u, active: !u.active } : u))
     );
+  };
+
+  const updateUserStatus = (id: string, status: "approved" | "rejected") => {
+    const user = allUsers.find((u) => u.id === id);
+    if (dbUsers.some((u) => u.id === id)) {
+      if (status === "approved") {
+        handleApproveUser(id);
+      } else {
+        handleRejectUser(id);
+      }
+    } else {
+      update(
+        "users",
+        data.users.map((u) => (u.id === id ? { ...u, status, active: status === "approved" } : u))
+      );
+    }
+    if (status === "approved") {
+      toast.success("تمت الموافقة", `تمت الموافقة على المستخدم "${user?.name}"`);
+    } else {
+      toast.warning("تم الرفض", `تم رفض المستخدم "${user?.name}"`);
+    }
   };
 
   const openAddRole = () => {
@@ -165,10 +275,16 @@ export default function UsersAdminPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">إدارة المستخدمين</h1>
-        <Button onClick={activeTab === "users" ? openAddUser : openAddRole} size="sm">
-          <Plus className="h-4 w-4" />
-          {activeTab === "users" ? "إضافة مستخدم" : "إضافة دور"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={fetchDbUsers} variant="outline" size="sm" disabled={loadingUsers}>
+            <RefreshCw className={`h-4 w-4 ${loadingUsers ? "animate-spin" : ""}`} />
+            تحديث
+          </Button>
+          <Button onClick={activeTab === "users" ? openAddUser : openAddRole} size="sm">
+            <Plus className="h-4 w-4" />
+            {activeTab === "users" ? "إضافة مستخدم" : "إضافة دور"}
+          </Button>
+        </div>
       </div>
 
       <div className="mb-6 flex gap-2 border-b border-border">
@@ -198,9 +314,34 @@ export default function UsersAdminPage() {
 
       {activeTab === "users" && (
         <>
+          {/* Status Filter Tabs */}
+          <div className="mb-4 flex gap-1 rounded-xl bg-muted/40 p-1">
+            {[
+              { key: "all" as const, label: "الجميع", count: allUsers.length },
+              { key: "pending" as const, label: "قيد المراجعة", count: allUsers.filter((u) => (u.status || "approved") === "pending").length },
+              { key: "approved" as const, label: "تمت الموافقة", count: allUsers.filter((u) => (u.status || "approved") === "approved").length },
+              { key: "rejected" as const, label: "مرفوض", count: allUsers.filter((u) => (u.status || "approved") === "rejected").length },
+            ].map((f) => (
+              <button
+                key={f.key}
+                onClick={() => { setStatusFilter(f.key); setPage(1); }}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  statusFilter === f.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f.label}
+                <span className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold ${
+                  statusFilter === f.key ? "bg-accent text-white" : "bg-muted text-muted-foreground"
+                }`}>
+                  {f.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
           <div className="mb-4 flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              عرض {paged.length} من {total} مستخدم
+              عرض {paged.length} من {total} مستخدم {statusFilter !== "all" ? `(${statusFilter === "pending" ? "قيد المراجعة" : statusFilter === "approved" ? "مقبول" : "مرفوض"})` : ""}
             </p>
           </div>
 
@@ -232,45 +373,85 @@ export default function UsersAdminPage() {
                       <th className="px-4 py-3 text-right font-semibold">البريد الإلكتروني</th>
                       <th className="px-4 py-3 text-right font-semibold">الدور</th>
                       <th className="px-4 py-3 text-right font-semibold">الحالة</th>
+                      <th className="px-4 py-3 text-right font-semibold">الموافقة</th>
                       <th className="px-4 py-3 text-right font-semibold">تاريخ الإنشاء</th>
                       <th className="px-4 py-3 text-right font-semibold">الإجراءات</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {paged.map((user) => (
-                      <tr key={user.id} className="border-b border-border/50 hover:bg-muted/20">
-                        <td className="px-4 py-3 font-medium">{user.name}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{user.email}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getRoleBadgeColor(user.role)}`}>
-                            {getRoleName(user.role)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button onClick={() => toggleUserActive(user.id)} className="text-muted-foreground hover:text-foreground">
-                            {user.active ? (
-                              <UserCheck className="h-4 w-4 text-success" />
-                            ) : (
-                              <UserX className="h-4 w-4" />
-                            )}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{user.createdAt}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => openEditUser(user)} className="rounded-lg p-1.5 hover:bg-muted/60">
-                              <Pencil className="h-3.5 w-3.5 text-accent" />
-                            </button>
+                    {paged.map((user) => {
+                      const userStatus = user.status || "approved";
+                      const sc = statusConfig[userStatus] || statusConfig.approved;
+                      const StatusIcon = sc.icon;
+                      return (
+                        <tr key={user.id} className="border-b border-border/50 hover:bg-muted/20">
+                          <td className="px-4 py-3">
                             <button
-                              onClick={() => setDeleteUserConfirm(user.id)}
-                              className="rounded-lg p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20"
+                              onClick={() => setDetailModalUser(user)}
+                              className="font-medium text-accent hover:underline"
                             >
-                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                              {user.name}
                             </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">{user.email}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getRoleBadgeColor(user.role)}`}>
+                              {getRoleName(user.role)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button onClick={() => toggleUserActive(user.id)} className="text-muted-foreground hover:text-foreground">
+                              {user.active ? (
+                                <UserCheck className="h-4 w-4 text-success" />
+                              ) : (
+                                <UserX className="h-4 w-4" />
+                              )}
+                            </button>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${sc.color}`}>
+                              <StatusIcon className="h-3 w-3" />
+                              {sc.label}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">{user.createdAt}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1">
+                              {userStatus === "pending" && (
+                                <>
+                                  <button
+                                    onClick={() => updateUserStatus(user.id, "approved")}
+                                    className="rounded-lg p-1.5 hover:bg-green-50 dark:hover:bg-green-950/20"
+                                    title="موافقة"
+                                  >
+                                    <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                                  </button>
+                                  <button
+                                    onClick={() => updateUserStatus(user.id, "rejected")}
+                                    className="rounded-lg p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20"
+                                    title="رفض"
+                                  >
+                                    <XCircle className="h-3.5 w-3.5 text-red-500" />
+                                  </button>
+                                </>
+                              )}
+                              <button onClick={() => setDetailModalUser(user)} className="rounded-lg p-1.5 hover:bg-muted/60" title="عرض التفاصيل">
+                                <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                              </button>
+                              <button onClick={() => openEditUser(user)} className="rounded-lg p-1.5 hover:bg-muted/60">
+                                <Pencil className="h-3.5 w-3.5 text-accent" />
+                              </button>
+                              <button
+                                onClick={() => setDeleteUserConfirm(user.id)}
+                                className="rounded-lg p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20"
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -411,6 +592,17 @@ export default function UsersAdminPage() {
                 />
               </div>
               <div>
+                <label className="mb-1 block text-sm font-medium">رقم الهاتف</label>
+                <input
+                  type="tel"
+                  dir="ltr"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+                  value={userForm.phone}
+                  onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
+                  placeholder="+964 ..."
+                />
+              </div>
+              <div>
                 <label className="mb-1 block text-sm font-medium">الدور</label>
                 <select
                   className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
@@ -438,6 +630,107 @@ export default function UsersAdminPage() {
                   إلغاء
                 </Button>
                 <Button onClick={saveUser}>{editingUserId ? "حفظ التعديلات" : "إضافة"}</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {detailModalUser && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4"
+          onClick={() => setDetailModalUser(null)}
+        >
+          <Card className="my-8 w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>تفاصيل المستخدم</CardTitle>
+              <button onClick={() => setDetailModalUser(null)} className="rounded-lg p-1 hover:bg-muted/60">
+                <X className="h-5 w-5" />
+              </button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="grid size-16 place-items-center rounded-full bg-accent/10 text-2xl font-bold text-accent">
+                  {detailModalUser.name.slice(0, 2)}
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold">{detailModalUser.name}</h3>
+                  <p className="text-sm text-muted-foreground">{detailModalUser.email}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted/30 p-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">الدور: </span>
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getRoleBadgeColor(detailModalUser.role)}`}>
+                    {getRoleName(detailModalUser.role)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">الحالة: </span>
+                  <span className={detailModalUser.active ? "text-green-600" : "text-red-500"}>
+                    {detailModalUser.active ? "مفعل" : "غير مفعل"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">رقم الهاتف: </span>
+                  <span>{detailModalUser.phone || "غير محدد"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">تاريخ الإنشاء: </span>
+                  <span>{detailModalUser.createdAt}</span>
+                </div>
+                {detailModalUser.lastLogin && (
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">آخر تسجيل دخول: </span>
+                    <span>{detailModalUser.lastLogin}</span>
+                  </div>
+                )}
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">الموافقة: </span>
+                  {(() => {
+                    const s = detailModalUser.status || "approved";
+                    const sc = statusConfig[s] || statusConfig.approved;
+                    const SI = sc.icon;
+                    return (
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${sc.color}`}>
+                        <SI className="h-3 w-3" />
+                        {sc.label}
+                      </span>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {(detailModalUser.status || "approved") === "pending" && (
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => {
+                      updateUserStatus(detailModalUser.id, "approved");
+                      setDetailModalUser({ ...detailModalUser, status: "approved", active: true });
+                    }}
+                    className="bg-green-600 text-white hover:bg-green-700"
+                  >
+                    <CheckCircle className="h-4 w-4" /> موافقة
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      updateUserStatus(detailModalUser.id, "rejected");
+                      setDetailModalUser({ ...detailModalUser, status: "rejected", active: false });
+                    }}
+                    className="border-red-300 text-red-600 hover:bg-red-50"
+                  >
+                    <XCircle className="h-4 w-4" /> رفض
+                  </Button>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-border">
+                <Button variant="outline" onClick={() => setDetailModalUser(null)}>إغلاق</Button>
+                <Button onClick={() => { setDetailModalUser(null); openEditUser(detailModalUser); }}>
+                  <Pencil className="h-4 w-4" /> تعديل
+                </Button>
               </div>
             </CardContent>
           </Card>

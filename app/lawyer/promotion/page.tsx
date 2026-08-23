@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/card";
@@ -19,8 +18,6 @@ import {
   MapPin,
   Calendar,
   Star,
-  ShieldCheck,
-  ArrowRight,
   AlertCircle,
 } from "lucide-react";
 import { toast } from "@/lib/admin-toast";
@@ -255,7 +252,7 @@ export default function LawyerPromotionPage() {
                         <div>
                           <h3 className="text-lg font-bold">{plan.name}</h3>
                           <p className="text-2xl font-extrabold text-accent mt-1">
-                            {plan.price.toLocaleString("ar-IQ")} د.ع
+                            {plan.price.toLocaleString("en-US")} د.ع
                             <span className="text-sm font-normal text-muted-foreground">
                               /{plan.type === "monthly" ? "شهرياً" : "سنوياً"}
                             </span>
@@ -304,7 +301,7 @@ export default function LawyerPromotionPage() {
                   <div className="flex justify-between border-t border-border pt-2 mt-2">
                     <span className="text-muted-foreground">الإجمالي:</span>
                     <span className="font-bold text-accent text-lg">
-                      {selectedPlanData.price.toLocaleString("ar-IQ")} د.ع
+                      {selectedPlanData.price.toLocaleString("en-US")} د.ع
                     </span>
                   </div>
                 </div>

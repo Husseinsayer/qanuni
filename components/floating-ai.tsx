@@ -16,7 +16,7 @@ export function FloatingAI() {
       <button
         aria-label="المساعد القانوني"
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 left-6 z-40 grid size-14 place-items-center rounded-full gradient-primary text-white shadow-glow transition hover:scale-105"
+        className="fixed bottom-6 right-6 z-40 grid size-14 place-items-center rounded-full gradient-primary text-white shadow-glow transition hover:scale-105"
       >
         <Bot className="size-6" />
         <span className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-gold text-[#1F2937]">
@@ -31,7 +31,7 @@ export function FloatingAI() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.25 }}
-            className="fixed bottom-24 left-6 z-50 w-[340px] max-w-[calc(100vw-3rem)] overflow-hidden rounded-3xl border border-border bg-card shadow-premium"
+            className="fixed bottom-24 right-6 z-50 w-[340px] max-w-[calc(100vw-3rem)] overflow-hidden rounded-3xl border border-border bg-card shadow-premium"
           >
             <div className="flex items-center justify-between bg-gradient-to-l from-secondary to-accent px-5 py-4 text-white">
               <div className="flex items-center gap-2">

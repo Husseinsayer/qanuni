@@ -1,390 +1,244 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Database,
   Download,
   Upload,
   Trash2,
-  Check,
-  AlertTriangle,
-  Clock,
-  FileJson,
   RefreshCw,
-  HardDrive,
   Shield,
-  ChevronDown,
+  Clock,
+  HardDrive,
+  CheckCircle,
+  Loader2,
+  FileJson,
+  Eye,
+  X,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { useAdminContext } from "@/app/admin/admin-context";
+import { toast } from "@/lib/admin-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-type BackupEntry = {
+interface BackupMeta {
   id: string;
-  name: string;
-  date: string;
-  size: string;
-  keys: string[];
-};
+  filename: string;
+  createdAt: string;
+  sizeBytes: number;
+  modelCounts: Record<string, number>;
+  totalRecords: number;
+  checksum: string;
+}
 
-const BACKUP_HISTORY_KEY = "admin_backup_history";
-const ALL_STORAGE_KEYS = [
-  "admin_site_data",
-  "user_accounts",
-  "user_session",
-  "lawyer_profiles",
-  "lawyer_extended_data",
-  "admin_session",
-  "analytics_page_views",
-  "favorites",
-  "saved_articles",
-  // Articles & Laws
-  "admin_articles",
-  "admin_laws",
-  // Knowledge Center
-  "kc_procedures",
-  "kc_templates",
-  "kc_services",
-  "kc_qa",
-  "kc_terms",
-  "kc_governments",
-  "kc_documents",
-  "kc_keywords",
-  // AI Assistant
-  "ai_settings",
-  "ai_faqs",
-  "ai_conversations",
-  "ai_analytics",
-  // Ads & Banners
-  "admin_ads",
-  "admin_banners",
-  "admin_html_codes",
-  // Law Firms
-  "admin_law_firms",
-  // SEO
-  "admin_seo",
-  // Theme & Settings
-  "admin_theme",
-  "admin_settings",
-  // Activity Log
-  "admin_activity_log",
-] as const;
+interface DbStats {
+  [modelName: string]: number;
+}
 
 function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
-function getBackupHistory(): BackupEntry[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(BACKUP_HISTORY_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("ar-IQ", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-function saveBackupHistory(history: BackupEntry[]): void {
-  localStorage.setItem(BACKUP_HISTORY_KEY, JSON.stringify(history));
-}
+export default function BackupAdminPage() {
+  const [backups, setBackups] = useState<BackupMeta[]>([]);
+  const [stats, setStats] = useState<DbStats>({});
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [restoring, setRestoring] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmRestore, setConfirmRestore] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [viewingBackup, setViewingBackup] = useState<BackupMeta | null>(null);
 
-function collectAllData(): Record<string, unknown> {
-  const data: Record<string, unknown> = {};
-  for (const key of ALL_STORAGE_KEYS) {
-    try {
-      const raw = localStorage.getItem(key);
-      data[key] = raw ? JSON.parse(raw) : null;
-    } catch { data[key] = null; }
-  }
-  // Also include all dynamic keys from localStorage (reviews, chat, messages, knowledge center items, etc.)
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && !(ALL_STORAGE_KEYS as readonly string[]).includes(key)) {
-      try {
-        // Include all remaining keys that aren't in the static list
-        const raw = localStorage.getItem(key);
-        if (raw) {
-          data[key] = JSON.parse(raw);
-        }
-      } catch { /* skip non-JSON keys */ }
-    }
-  }
-  return data;
-}
-
-function restoreAllData(data: Record<string, unknown>): { success: number; failed: number } {
-  let success = 0;
-  let failed = 0;
-  // First restore the static keys
-  for (const key of ALL_STORAGE_KEYS) {
-    try {
-      if (data[key] !== null && data[key] !== undefined) {
-        localStorage.setItem(key, JSON.stringify(data[key]));
-        success++;
-      }
-    } catch { failed++; }
-  }
-  // Then restore all dynamic keys from the backup
-  for (const key of Object.keys(data)) {
-    if (!(ALL_STORAGE_KEYS as readonly string[]).includes(key)) {
-      try {
-        if (data[key] !== null && data[key] !== undefined) {
-          localStorage.setItem(key, JSON.stringify(data[key]));
-          success++;
-        }
-      } catch { failed++; }
-    }
-  }
-  return { success, failed };
-}
-
-export default function BackupPage() {
-  const { data: adminData, update } = useAdminContext();
-  const [history, setHistory] = useState<BackupEntry[]>([]);
-  const [status, setStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [restoring, setRestoring] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { setHistory(getBackupHistory()); }, []);
-
-  const showStatus = useCallback((type: "success" | "error", msg: string) => {
-    setStatus({ type, msg });
-    setTimeout(() => setStatus(null), 4000);
-  }, []);
-
-  const handleCreateBackup = () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const allData = collectAllData();
-      const json = JSON.stringify(allData, null, 2);
-      const blob = new Blob([json], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-
-      const a = document.createElement("a");
-      const now = new Date();
-      const filename = `backup-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}.json`;
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      // Record in history
-      const entry: BackupEntry = {
-        id: `bkp-${Date.now()}`,
-        name: filename,
-        date: new Date().toISOString(),
-        size: formatBytes(blob.size),
-        keys: Object.keys(allData),
-      };
-      const updated = [entry, ...history].slice(0, 20);
-      saveBackupHistory(updated);
-      setHistory(updated);
-      showStatus("success", `✅ تم إنشاء النسخة الاحتياطية بنجاح (${entry.size})`);
-    } catch (e) {
-      showStatus("error", "❌ فشل إنشاء النسخة الاحتياطية");
+      const [backupsRes, statsRes] = await Promise.all([
+        fetch("/api/admin/backup"),
+        fetch("/api/admin/backup?action=stats"),
+      ]);
+      if (backupsRes.ok) {
+        const { backups: b } = await backupsRes.json();
+        setBackups(b);
+      }
+      if (statsRes.ok) {
+        const { stats: s } = await statsRes.json();
+        setStats(s);
+      }
+    } catch {
+      toast.error("خطأ", "تعذر تحميل البيانات");
     }
     setLoading(false);
-  };
+  }, []);
 
-  const handleRestore = (file: File) => {
-    setRestoring(true);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target?.result as string) as Record<string, unknown>;
-        const result = restoreAllData(data);
-        showStatus("success", `✅ تمت استعادة ${result.success} عنصر بنجاح (فشل ${result.failed}) — سيتم إعادة تحميل الصفحة`);
-        setTimeout(() => window.location.reload(), 2000);
-      } catch {
-        showStatus("error", "❌ الملف غير صالح — تأكد من اختيار ملف نسخة احتياطية صحيح");
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleCreate = async () => {
+    setCreating(true);
+    try {
+      const res = await fetch("/api/admin/backup", { method: "POST" });
+      if (res.ok) {
+        const { meta } = await res.json();
+        toast.success("تم النسخ الاحتياطي", `تم إنشاء نسخة احتياطية: ${meta.id}`);
+        await fetchData();
+      } else {
+        const err = await res.json();
+        toast.error("فشل", err.error || "حدث خطأ");
       }
-      setRestoring(false);
-    };
-    reader.onerror = () => { showStatus("error", "❌ فشل قراءة الملف"); setRestoring(false); };
-    reader.readAsText(file);
+    } catch {
+      toast.error("خطأ", "تعذر الاتصال بالخادم");
+    }
+    setCreating(false);
   };
 
-  const handleDeleteBackup = (id: string) => {
-    const updated = history.filter((h) => h.id !== id);
-    saveBackupHistory(updated);
-    setHistory(updated);
-    showStatus("success", "🗑️ تم حذف النسخة من السجل");
+  const handleRestore = async (filename: string) => {
+    setRestoring(filename);
+    setConfirmRestore(null);
+    try {
+      const res = await fetch("/api/admin/backup", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename }),
+      });
+      if (res.ok) {
+        const { counts } = await res.json();
+        const total = Object.values(counts as Record<string, number>).reduce((a, b) => a + b, 0);
+        toast.success("تمت الاستعادة", `تم استعادة ${total} سجل من النسخة الاحتياطية`);
+        await fetchData();
+      } else {
+        const err = await res.json();
+        toast.error("فشل", err.error || "حدث خطأ");
+      }
+    } catch {
+      toast.error("خطأ", "تعذر الاتصال بالخادم");
+    }
+    setRestoring(null);
   };
 
-  const handleDownloadBackup = (entry: BackupEntry) => {
-    // Re-create from stored data or just download the stored reference
-    const allData = collectAllData();
-    const json = JSON.stringify(allData, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = entry.name;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleDelete = async (filename: string) => {
+    setDeleting(filename);
+    setConfirmDelete(null);
+    try {
+      const res = await fetch(`/api/admin/backup?file=${encodeURIComponent(filename)}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        toast.success("تم الحذف", "تم حذف النسخة الاحتياطية");
+        await fetchData();
+      } else {
+        toast.error("فشل", "تعذر الحذف");
+      }
+    } catch {
+      toast.error("خطأ", "تعذر الاتصال بالخادم");
+    }
+    setDeleting(null);
   };
+
+  const totalRecords = Object.values(stats).reduce((a, b) => a + b, 0);
+  const activeModels = Object.entries(stats).filter(([, v]) => v > 0);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
-            <Database className="size-8 text-accent" />
-            النسخ الاحتياطي والاستعادة
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            احفظ نسخة احتياطية كاملة من جميع بيانات الموقع واستعدها عند الحاجة
+          <h1 className="text-2xl font-bold">النسخ الاحتياطي والاستعادة</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            نسخ احتياطي لجميع بيانات الموقع واستعادتها
           </p>
         </div>
-      </div>
-
-      {status && (
-        <div className={cn(
-          "rounded-2xl border px-5 py-4 text-sm font-medium flex items-center gap-3 shadow-soft transition-all",
-          status.type === "success" ? "border-success/30 bg-success/10 text-success" : "border-danger/30 bg-danger/10 text-danger"
-        )}>
-          {status.type === "success" ? <Check className="size-5" /> : <AlertTriangle className="size-5" />}
-          {status.msg}
-        </div>
-      )}
-
-      {/* Backup / Restore Cards */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* إنشاء نسخة احتياطية */}
-        <Card className="border-0 shadow-soft overflow-hidden">
-          <div className="h-1.5 bg-gradient-to-l from-accent to-accent/50" />
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Download className="size-5 text-accent" />
-              إنشاء نسخة احتياطية
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              إنشاء نسخة احتياطية كاملة تشمل جميع بيانات الموقع: الإعدادات، المحامين، الحسابات، المقالات، الإعلانات، التحليلات، والمزيد.
-            </p>
-            <div className="rounded-xl bg-muted/30 border border-border p-4">
-              <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
-                <HardDrive className="size-3.5" /> سيتم نسخ البيانات التالية:
-              </p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {["إعدادات الموقع", "المحامين", "المستخدمين", "الحسابات", "الإعلانات", "التحليلات", "التفضيلات", "التقييمات"].map((item) => (
-                  <span key={item} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Check className="size-3 text-success" /> {item}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <Button onClick={handleCreateBackup} disabled={loading} variant="accent" size="lg" className="w-full gap-2 shadow-soft">
-              {loading ? <RefreshCw className="size-4 animate-spin" /> : <Download className="size-4" />}
-              {loading ? "جارٍ الإنشاء..." : "إنشاء نسخة احتياطية"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* استعادة نسخة احتياطية */}
-        <Card className="border-0 shadow-soft overflow-hidden">
-          <div className="h-1.5 bg-gradient-to-l from-amber-500 to-orange-500" />
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Upload className="size-5 text-amber-500" />
-              استعادة نسخة احتياطية
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              استعادة البيانات من ملف النسخة الاحتياطية. سيتم استبدال جميع البيانات الحالية بالبيانات الموجودة في الملف.
-            </p>
-            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="size-4 text-amber-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">تنبيه مهم</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    الاستعادة ستستبدل جميع البيانات الحالية. يُفضل إنشاء نسخة احتياطية قبل الاستعادة.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleRestore(file);
-                e.target.value = "";
-              }}
-            />
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={restoring}
-              variant="gold"
-              size="lg"
-              className="w-full gap-2 shadow-soft"
-            >
-              {restoring ? <RefreshCw className="size-4 animate-spin" /> : <Upload className="size-4" />}
-              {restoring ? "جارٍ الاستعادة..." : "اختيار ملف واستعادة"}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Backup History */}
-      <Card className="border-0 shadow-soft">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl">
-            <Clock className="size-5 text-accent" />
-            سجل النسخ الاحتياطي
-            {history.length > 0 && (
-              <span className="text-sm font-normal text-muted-foreground">({history.length})</span>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            تحديث
+          </Button>
+          <Button size="sm" onClick={handleCreate} disabled={creating}>
+            {creating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
             )}
+            إنشاء نسخة احتياطية
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Card className="border-blue-200/50 bg-blue-50/50 dark:border-blue-800/30 dark:bg-blue-950/20">
+          <CardContent className="flex items-center gap-4 p-5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40">
+              <Database className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">إجمالي السجلات</p>
+              <p className="mt-0.5 text-2xl font-bold">{totalRecords.toLocaleString("ar-IQ")}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-green-200/50 bg-green-50/50 dark:border-green-800/30 dark:bg-green-950/20">
+          <CardContent className="flex items-center gap-4 p-5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/40">
+              <HardDrive className="h-6 w-6 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">النسخ الاحتياطية</p>
+              <p className="mt-0.5 text-2xl font-bold">{backups.length}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-amber-200/50 bg-amber-50/50 dark:border-amber-800/30 dark:bg-amber-950/20">
+          <CardContent className="flex items-center gap-4 p-5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/40">
+              <Shield className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">الجداول النشطة</p>
+              <p className="mt-0.5 text-2xl font-bold">{activeModels.length}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Database Structure */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Database className="h-5 w-5" />
+            هيكل قاعدة البيانات
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {history.length === 0 ? (
-            <div className="py-12 text-center">
-              <Database className="mx-auto mb-3 size-12 text-muted-foreground/20" />
-              <p className="text-lg font-semibold">لا توجد نسخ احتياطية</p>
-              <p className="text-sm text-muted-foreground">قم بإنشاء أول نسخة احتياطية الآن</p>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="space-y-2">
-              {history.map((entry) => (
-                <div key={entry.id}
-                  className="flex items-center justify-between rounded-xl border border-border p-4 transition hover:border-accent/30 hover:bg-accent/5"
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
+              {activeModels.map(([model, count]) => (
+                <div
+                  key={model}
+                  className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent/10">
-                      <FileJson className="size-5 text-accent" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate">{entry.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(entry.date).toLocaleString("ar-IQ")} · {entry.size} · {entry.keys.length} عنصر
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => handleDownloadBackup(entry)}
-                      className="rounded-lg p-2 text-muted-foreground hover:bg-accent/10 hover:text-accent transition"
-                      title="تحميل النسخة"
-                    >
-                      <Download className="size-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteBackup(entry.id)}
-                      className="rounded-lg p-2 text-muted-foreground hover:bg-danger/10 hover:text-danger transition"
-                      title="حذف من السجل"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </div>
+                  <span className="text-xs font-medium text-muted-foreground">{model}</span>
+                  <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-bold text-accent">
+                    {count.toLocaleString("ar-IQ")}
+                  </span>
                 </div>
               ))}
             </div>
@@ -392,39 +246,184 @@ export default function BackupPage() {
         </CardContent>
       </Card>
 
-      {/* Export Admin Settings */}
-      <Card className="border-0 shadow-soft">
+      {/* Backups List */}
+      <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl">
-            <Shield className="size-5 text-accent" />
-            تصدير إعدادات الإدارة
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Clock className="h-5 w-5" />
+            النسخ الاحتياطية
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="mb-4 text-sm text-muted-foreground">
-            تصدير إعدادات لوحة التحكم فقط (بدون بيانات المستخدمين والمحامين) لمشاركتها بين بيئات مختلفة.
-          </p>
-          <Button
-            onClick={() => {
-              const json = JSON.stringify(adminData, null, 2);
-              const blob = new Blob([json], { type: "application/json" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `admin-settings-${new Date().toISOString().slice(0, 10)}.json`;
-              a.click();
-              URL.revokeObjectURL(url);
-              showStatus("success", "✅ تم تصدير إعدادات الإدارة بنجاح");
-            }}
-            variant="outline"
-            size="sm"
-            className="gap-2"
-          >
-            <FileJson className="size-4" />
-            تصدير إعدادات الإدارة
-          </Button>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : backups.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <HardDrive className="mb-3 h-12 w-12 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">لا توجد نسخ احتياطية بعد</p>
+              <p className="mt-1 text-xs text-muted-foreground/60">
+                أنشئ نسخة احتياطية للحفاظ على بياناتك
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-muted/40">
+                  <tr>
+                    <th className="px-4 py-3 text-right font-semibold">التاريخ</th>
+                    <th className="px-4 py-3 text-right font-semibold">المعرف</th>
+                    <th className="px-4 py-3 text-right font-semibold">الحجم</th>
+                    <th className="px-4 py-3 text-right font-semibold">السجلات</th>
+                    <th className="px-4 py-3 text-right font-semibold">التحقق</th>
+                    <th className="px-4 py-3 text-right font-semibold">الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {backups.map((backup) => (
+                    <tr key={backup.id} className="border-b border-border/50 hover:bg-muted/20">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span>{formatDate(backup.createdAt)}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                        {backup.id}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <FileJson className="h-3.5 w-3.5 text-muted-foreground" />
+                          {formatBytes(backup.sizeBytes)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-bold text-accent">
+                          {backup.totalRecords.toLocaleString("ar-IQ")}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setViewingBackup(backup)}
+                            className="rounded-lg p-1.5 hover:bg-muted/60"
+                            title="عرض التفاصيل"
+                          >
+                            <Eye className="h-3.5 w-3.5 text-accent" />
+                          </button>
+                          <button
+                            onClick={() => setConfirmRestore(backup.filename)}
+                            disabled={restoring === backup.filename}
+                            className="rounded-lg p-1.5 hover:bg-green-50 dark:hover:bg-green-950/20 disabled:opacity-50"
+                            title="استعادة"
+                          >
+                            {restoring === backup.filename ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-green-500" />
+                            ) : (
+                              <Upload className="h-3.5 w-3.5 text-green-500" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDelete(backup.filename)}
+                            disabled={deleting === backup.filename}
+                            className="rounded-lg p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20 disabled:opacity-50"
+                            title="حذف"
+                          >
+                            {deleting === backup.filename ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-red-500" />
+                            ) : (
+                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Restore Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmRestore !== null}
+        title="تأكيد الاستعادة"
+        message="هل أنت متأكد من استعادة هذه النسخة الاحتياطية؟ سيتم حذف جميع البيانات الحالية واستعادتها من النسخة الاحتياطية. هذا الإجراء لا يمكن التراجع عنه."
+        onConfirm={() => confirmRestore && handleRestore(confirmRestore)}
+        onCancel={() => setConfirmRestore(null)}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title="تأكيد الحذف"
+        message="هل أنت متأكد من حذف هذه النسخة الاحتياطية؟ لا يمكن التراجع عن هذا الإجراء."
+        onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
+
+      {/* View Backup Details Modal */}
+      {viewingBackup && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4" onClick={() => setViewingBackup(null)}>
+          <Card className="my-8 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5 text-accent" />
+                تفاصيل النسخة الاحتياطية
+              </CardTitle>
+              <button onClick={() => setViewingBackup(null)} className="rounded-lg p-1 hover:bg-muted/60">
+                <X className="h-5 w-5" />
+              </button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">المعرف: </span>
+                  <span className="font-mono font-medium">{viewingBackup.id}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">التاريخ: </span>
+                  <span className="font-medium">{formatDate(viewingBackup.createdAt)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">الحجم: </span>
+                  <span className="font-medium">{formatBytes(viewingBackup.sizeBytes)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">إجمالي السجلات: </span>
+                  <span className="font-bold text-accent">{viewingBackup.totalRecords.toLocaleString("ar-IQ")}</span>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border p-4">
+                <h4 className="mb-3 text-sm font-bold text-accent">عدد السجلات حسب الجدول</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(viewingBackup.modelCounts)
+                    .filter(([, count]) => count > 0)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([model, count]) => (
+                      <div key={model} className="flex items-center justify-between rounded-lg bg-muted/20 px-3 py-1.5">
+                        <span className="text-xs text-muted-foreground">{model}</span>
+                        <span className="text-xs font-bold">{count.toLocaleString("ar-IQ")}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border p-4">
+                <h4 className="mb-2 text-sm font-bold text-accent">Checksum</h4>
+                <p className="break-all font-mono text-xs text-muted-foreground">{viewingBackup.checksum}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

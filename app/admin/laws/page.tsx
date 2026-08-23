@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAdminContext } from "../admin-context";
@@ -21,12 +21,14 @@ const emptyLaw: Omit<SerializableLaw, "id"> = {
   icon: "Scale",
   color: "#1E3A8A",
   category: "",
+  source: "",
+  status: "نافذ",
 };
 
 const emptySample: SampleArticle = { num: 0, text: "" };
 
 export default function LawsAdminPage() {
-  const { data, update } = useAdminContext();
+  const { data, update, updateBatch } = useAdminContext();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Omit<SerializableLaw, "id">>(emptyLaw);
@@ -66,23 +68,23 @@ export default function LawsAdminPage() {
     setModalOpen(true);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!form.name.trim()) return;
 
     // Sort articles by number
     const sortedSamples = [...samples].sort((a, b) => a.num - b.num);
+    // Auto-calculate article count from samples
+    const articleCount = sortedSamples.length;
 
     if (editingId) {
-      update(
-        "laws",
-        data.laws.map((l) => (l.id === editingId ? { ...form, id: editingId, icon: iconName } : l))
-      );
-      update("sampleArticles", { ...data.sampleArticles, [editingId]: sortedSamples });
+      updateBatch({
+        laws: data.laws.map((l) => (l.id === editingId ? { ...form, id: editingId, icon: iconName, articles: articleCount } : l)),
+        sampleArticles: { ...data.sampleArticles, [editingId]: sortedSamples },
+      });
       toast.success("تم الحفظ بنجاح");
     } else {
       const newId = `law-${Date.now()}`;
-      const newLaw = { ...form, id: newId, icon: iconName };
-      // Insert in sorted position (alphabetical by name)
+      const newLaw = { ...form, id: newId, icon: iconName, articles: articleCount };
       const insertAt = data.laws.findIndex(
         (l) => l.name.localeCompare(newLaw.name, "ar") > 0
       );
@@ -92,19 +94,23 @@ export default function LawsAdminPage() {
       } else {
         newLaws.splice(insertAt, 0, newLaw);
       }
-      update("laws", newLaws);
-      update("sampleArticles", { ...data.sampleArticles, [newId]: sortedSamples });
+      updateBatch({
+        laws: newLaws,
+        sampleArticles: { ...data.sampleArticles, [newId]: sortedSamples },
+      });
       toast.success("تم الحفظ بنجاح", `تمت إضافة القانون "${form.name}"`);
     }
     setModalOpen(false);
   };
 
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     const law = data.laws.find((l) => l.id === id);
-    update("laws", data.laws.filter((l) => l.id !== id));
     const newSamples = { ...data.sampleArticles };
     delete newSamples[id];
-    update("sampleArticles", newSamples);
+    updateBatch({
+      laws: data.laws.filter((l) => l.id !== id),
+      sampleArticles: newSamples,
+    });
     toast.success("تم الحذف", `تم حذف القانون "${law?.name || ""}"`);
     setDeleteConfirm(null);
   };
@@ -122,11 +128,13 @@ export default function LawsAdminPage() {
     }
   };
 
-  const saveExpandedEdits = () => {
+  const saveExpandedEdits = async () => {
     if (!expandedLaw) return;
     const sorted = [...editSamples].sort((a, b) => a.num - b.num);
-    update("sampleArticles", { ...data.sampleArticles, [expandedLaw]: sorted });
-    update("laws", data.laws.map((l) => l.id === expandedLaw ? { ...l, articles: sorted.length } : l));
+    updateBatch({
+      sampleArticles: { ...data.sampleArticles, [expandedLaw]: sorted },
+      laws: data.laws.map((l) => l.id === expandedLaw ? { ...l, articles: sorted.length } : l),
+    });
     setEditSamples(sorted);
     setHasChanges(false);
     toast.success("تم الحفظ", "تم حفظ التغييرات بنجاح");
@@ -238,14 +246,36 @@ export default function LawsAdminPage() {
     setCatModalOpen(true);
   };
 
+  const syncCategories = async (cats: typeof data.categories) => {
+    try {
+      await fetch("/api/site-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ categories: cats }),
+      });
+    } catch { /* noop */ }
+  };
+
+  // Sync categories to API on mount so public site has them
+  useEffect(() => {
+    if (data.categories.length > 0) {
+      syncCategories(data.categories);
+    }
+  }, []);
+
   const saveCat = () => {
     if (!catForm.name.trim()) return;
     if (catEditId) {
-      update("categories", data.categories.map((c) => (c.id === catEditId ? { ...c, name: catForm.name, icon: catForm.icon } : c)));
+      const updated = data.categories.map((c) => (c.id === catEditId ? { ...c, name: catForm.name, icon: catForm.icon } : c));
+      update("categories", updated);
+      syncCategories(updated);
       toast.success("تم الحفظ", `تم تحديث التصنيف "${catForm.name}"`);
     } else {
       const newId = `cat-${Date.now()}`;
-      update("categories", [...data.categories, { id: newId, name: catForm.name, icon: catForm.icon }]);
+      const updated = [...data.categories, { id: newId, name: catForm.name, icon: catForm.icon }];
+      update("categories", updated);
+      syncCategories(updated);
       toast.success("تمت الإضافة", `تمت إضافة التصنيف "${catForm.name}"`);
     }
     setCatModalOpen(false);
@@ -260,7 +290,9 @@ export default function LawsAdminPage() {
       setCatDeleteConfirm(null);
       return;
     }
-    update("categories", data.categories.filter((c) => c.id !== id));
+    const updated = data.categories.filter((c) => c.id !== id);
+    update("categories", updated);
+    syncCategories(updated);
     toast.success("تم الحذف", `تم حذف التصنيف "${cat?.name || ""}"`);
     setCatDeleteConfirm(null);
   };
@@ -604,14 +636,8 @@ export default function LawsAdminPage() {
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                 />
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">عدد المواد</label>
-                <input
-                  type="number"
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
-                  value={form.articles}
-                  onChange={(e) => setForm({ ...form, articles: Number(e.target.value) })}
-                />
+              <div className="col-span-2 rounded-xl border border-border bg-muted/30 px-4 py-3">
+                <p className="text-sm font-medium">عدد المواد: {samples.length}</p>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium">آخر تحديث</label>
@@ -621,6 +647,33 @@ export default function LawsAdminPage() {
                   value={form.updated}
                   onChange={(e) => setForm({ ...form, updated: e.target.value })}
                 />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">مصدر القانون</label>
+                <select
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+                  value={form.source || ""}
+                  onChange={(e) => setForm({ ...form, source: e.target.value })}
+                >
+                  <option value="">بدون مصدر</option>
+                  <option value="الوقائع العراقية">الوقائع العراقية</option>
+                  <option value="جريدة الوقائع">جريدة الوقائع</option>
+                  <option value="قرار مجلس الوزراء">قرار مجلس الوزراء</option>
+                  <option value="تعليمات وزارية">تعليمات وزارية</option>
+                  <option value="أخرى">أخرى</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">حالة القانون</label>
+                <select
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+                  value={form.status || "نافذ"}
+                  onChange={(e) => setForm({ ...form, status: e.target.value })}
+                >
+                  <option value="نافذ">نافذ</option>
+                  <option value="معدل">معدل</option>
+                  <option value="ملغي">ملغي</option>
+                </select>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium">اللون</label>
@@ -634,12 +687,24 @@ export default function LawsAdminPage() {
               <div>
                 <label className="mb-1 block text-sm font-medium">الأيقونة</label>
                 <select
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
-                  value={iconName}
-                  onChange={(e) => setIconName(e.target.value)}
+                  className="mb-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+                  value={iconNames.includes(iconName) ? iconName : "__custom__"}
+                  onChange={(e) => {
+                    if (e.target.value !== "__custom__") setIconName(e.target.value);
+                  }}
                 >
                   {iconNames.map((n) => <option key={n} value={n}>{n}</option>)}
+                  <option value="__custom__">رابط مخصص...</option>
                 </select>
+                {!iconNames.includes(iconName) && (
+                  <input
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+                    placeholder="https://example.com/icon.png"
+                    value={iconName}
+                    dir="ltr"
+                    onChange={(e) => setIconName(e.target.value)}
+                  />
+                )}
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium">التصنيف</label>
@@ -671,7 +736,7 @@ export default function LawsAdminPage() {
                 {bulkOpen && (
                   <div className="mb-3 rounded-xl border border-border p-3">
                     <p className="mb-2 text-xs text-muted-foreground">
-                      كل سطر = مادة واحدة بصيغة "رقم المادة: نص المادة"
+                      كل سطر = مادة واحدة بصيغة &quot;رقم المادة: نص المادة&quot;
                     </p>
                     <textarea
                       className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-accent"
@@ -692,7 +757,7 @@ export default function LawsAdminPage() {
                   {samples.map((sample, idx) => (
                     <div key={idx} className="rounded-xl border border-border p-3">
                       <div className="mb-2 flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">مادة {toArabicDigits(idx + 1)}</span>
+                        <span className="text-xs text-muted-foreground">المادة {toArabicDigits(sample.num || idx + 1)}</span>
                         <button onClick={() => removeSample(idx)} className="rounded p-0.5 hover:bg-red-50 dark:hover:bg-red-950/20">
                           <Trash2 className="h-3.5 w-3.5 text-red-500" />
                         </button>

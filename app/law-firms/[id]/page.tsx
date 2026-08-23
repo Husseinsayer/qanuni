@@ -1,23 +1,27 @@
 import { notFound } from "next/navigation";
-import { Phone, Mail, MapPin, Building2, Users, ArrowLeft } from "lucide-react";
-import { Card, Badge } from "@/components/ui/card";
-import { PageHeader } from "@/components/page-header";
-import { lawFirms, type LawFirm } from "@/lib/data";
+import { Phone, Mail, MapPin, Building2, Users } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
 import { buildDescription, absoluteUrl } from "@/lib/seo";
 import { getSeoDefaults } from "@/lib/seo-defaults";
+import { JsonLd } from "@/components/json-ld";
+import { AdBanner } from "@/components/ad-banner";
 import type { Metadata } from "next";
 
-export function generateStaticParams() {
-  return lawFirms.map((f) => ({ id: f.id }));
+export const dynamic = "force-dynamic";
+
+export async function generateStaticParams() {
+  const firms = await prisma.lawFirm.findMany({ select: { id: true } });
+  return firms.map((f) => ({ id: f.id }));
 }
 
-export function generateMetadata({ params }: { params: { id: string } }): Metadata {
-  const firm = lawFirms.find((f) => f.id === params.id);
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const firm = await prisma.lawFirm.findUnique({ where: { id: params.id } });
   const seo = getSeoDefaults();
   const title = firm ? firm.name : "مكتب محاماة";
   const desc = firm
-    ? buildDescription(`مكتب ${firm.name} — ${firm.city}. ${firm.lawyers.length} محامٍ.`, seo)
+    ? buildDescription(`مكتب ${firm.name} — ${firm.city}.`, seo)
     : undefined;
   const url = absoluteUrl(`/law-firms/${params.id}`, seo);
   return {
@@ -44,12 +48,32 @@ export function generateMetadata({ params }: { params: { id: string } }): Metada
   };
 }
 
-function FirmDetail({ id }: { id: string }) {
-  const firm = lawFirms.find((f) => f.id === id);
+async function FirmDetail({ id }: { id: string }) {
+  const firm = await prisma.lawFirm.findUnique({
+    where: { id },
+    include: { members: { include: { lawyer: true } } },
+  });
   if (!firm) notFound();
+  const seo = getSeoDefaults();
+
+  const memberCount = firm.members.length;
 
   return (
     <div className="container max-w-4xl pb-20">
+      <JsonLd data={{
+        "@context": "https://schema.org",
+        "@type": "LegalService",
+        name: firm.name,
+        description: `مكتب ${firm.name} — ${firm.city}`,
+        url: absoluteUrl(`/law-firms/${firm.id}`, seo),
+        address: { "@type": "PostalAddress", addressLocality: firm.city, addressCountry: "IQ" },
+        telephone: firm.phones ? JSON.parse(firm.phones)[0] : undefined,
+        email: firm.email || undefined,
+      }} />
+      {/* Ad: الشريط الجانبي للمكتب */}
+      <div className="container py-6">
+        <AdBanner placementKey="law-firm-sidebar" />
+      </div>
       {/* Firm hero */}
       <Card className="overflow-hidden">
         <div
@@ -66,7 +90,7 @@ function FirmDetail({ id }: { id: string }) {
                 <MapPin className="size-4" /> {firm.city}
               </span>
               <span className="flex items-center gap-1.5">
-                <Users className="size-4" /> {firm.lawyers.length} محامٍ
+                <Users className="size-4" /> {memberCount} محامٍ
               </span>
             </div>
           </div>
@@ -89,16 +113,20 @@ function FirmDetail({ id }: { id: string }) {
           <Phone className="size-5 text-accent" /> أرقام التواصل
         </h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {firm.phones.map((phone) => (
-            <a
-              key={phone}
-              href={`tel:${phone.replace(/\s+/g, "")}`}
-              className="flex items-center justify-end gap-3 rounded-2xl border border-border bg-card p-4 text-base font-semibold text-accent transition hover:border-accent hover:bg-accent/5"
-            >
-              <span dir="ltr">{phone}</span>
-              <Phone className="size-5" />
-            </a>
-          ))}
+          {(() => {
+            let phones: string[] = [];
+            try { phones = JSON.parse(firm.phones); } catch { phones = []; }
+            return phones.map((phone: string) => (
+              <a
+                key={phone}
+                href={`tel:${phone.replace(/\s+/g, "")}`}
+                className="flex items-center justify-end gap-3 rounded-2xl border border-border bg-card p-4 text-base font-semibold text-accent transition hover:border-accent hover:bg-accent/5"
+              >
+                <span dir="ltr">{phone}</span>
+                <Phone className="size-5" />
+              </a>
+            ));
+          })()}
         </div>
         {firm.email && (
           <a
@@ -117,58 +145,33 @@ function FirmDetail({ id }: { id: string }) {
           <Users className="size-5 text-accent" /> محامو المكتب
         </h3>
         <div className="space-y-3">
-          {firm.lawyers.map((lw) => (
-            <Card key={lw.name} className="card-hover p-5">
+          {firm.members.map((m) => (
+            <Card key={m.lawyerId} className="card-hover p-5">
               <div className="flex items-center gap-4">
                 <span
                   className={cn(
                     "grid size-12 place-items-center rounded-2xl bg-gradient-to-br text-lg font-extrabold text-white shadow-soft",
-                    lw.hue
+                    m.lawyer.hue
                   )}
                 >
-                  {lw.name.replace(/^(أ\.|الأستاذ|المحامية|أ\.د\.)\s*/, "").charAt(0)}
+                  {m.lawyer.initials || m.lawyer.name.charAt(0)}
                 </span>
                 <div className="min-w-0 flex-1 text-right">
-                  <p className="text-lg font-bold">{lw.name}</p>
-                  <p className="mt-0.5 text-sm text-muted-foreground">{lw.specialization}</p>
+                  <p className="text-lg font-bold">{m.lawyer.name}</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">{m.lawyer.specialization}</p>
                 </div>
               </div>
             </Card>
           ))}
         </div>
       </div>
-
-      {/* CTA */}
-      <div className="mt-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-muted/40 p-6">
-        <div>
-          <p className="font-bold">تحتاج استشارة من أحد محامي هذا المكتب؟</p>
-          <p className="text-sm text-muted-foreground">احجز موعداً مع محامٍ مختص الآن.</p>
-        </div>
-        <a
-          href="#contact"
-          className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-bold text-white transition hover:bg-accent/90"
-        >
-          احجز استشارة
-          <ArrowLeft className="size-4" />
-        </a>
-      </div>
     </div>
   );
 }
 
-export default function LawFirmPage({ params }: { params: { id: string } }) {
-  const firm = lawFirms.find((f) => f.id === params.id);
+export default async function LawFirmPage({ params }: { params: { id: string } }) {
   return (
     <>
-      <PageHeader
-        eyebrow="مكاتب المحامين"
-        title="تفاصيل المكتب"
-        crumbs={[
-          { label: "الرئيسية", href: "/" },
-          { label: "مكاتب المحامين", href: "/#law-firms" },
-          { label: firm?.name ?? "المكتب" },
-        ]}
-      />
       <FirmDetail id={params.id} />
     </>
   );

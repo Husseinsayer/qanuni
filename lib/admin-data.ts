@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { seoDefaults } from "./seo-defaults";
 import { analyticsDefaults, type AnalyticsSettings } from "./analytics";
 import {
-  type Law,
   type Lawyer,
   type Article,
   type LawFirm,
@@ -24,20 +23,18 @@ import {
   specializations as defaultSpecializations,
   sampleArticles as defaultSampleArticles,
   articleBodies as defaultArticleBodies,
+  articleHtml as defaultArticleHtml,
 } from "@/lib/data";
-import { iconMap, serializeIcon as _serializeIcon, resolveIcon } from "@/lib/icons";
+import { serializeIcon as _serializeIcon } from "@/lib/icons";
 
 function serializeIcon(icon: React.ComponentType<{ className?: string }>): string {
   return _serializeIcon(icon as any);
 }
 
-function deserializeIcon(name: string): React.ComponentType<{ className?: string }> {
-  return resolveIcon(name);
-}
-
 export interface AdminHero {
   badge: string;
   title: string;
+  titleGradient: string;
   subtitle: string;
   btnPrimary: string;
   btnSecondary: string;
@@ -348,7 +345,23 @@ export interface AdminTheme {
   darkMode: boolean;
 }
 
-export type AdType = "custom" | "adsense" | "html";
+/** IAB-standard ad sizes */
+export type AdSize =
+  | "responsive"
+  | "leaderboard"       // 728x90
+  | "large-leaderboard" // 970x90
+  | "billboard"         // 970x250
+  | "medium-rectangle"  // 300x250
+  | "large-rectangle"   // 336x280
+  | "skyscraper"        // 160x600
+  | "wide-skyscraper"   // 300x600
+  | "mobile-banner"     // 320x50
+  | "inline"            // 468x60
+  | "full-page"         // interstitial
+  | "sticky-bottom"     // anchored mobile
+  | "native";           // native ad
+
+export type AdType = "adsense" | "custom-image" | "custom-gradient" | "html" | "script" | "affiliate";
 
 export type AdSenseFormat = "auto" | "horizontal" | "vertical" | "rectangle";
 
@@ -361,20 +374,24 @@ export interface AdTargetDevices {
 
 /** Show ad only to matching context */
 export interface AdTargeting {
-  countries: string[]; // ISO codes, empty = all
-  languages: string[]; // empty = all
-  categories: string[]; // empty = all
-  tags: string[]; // empty = all
-  authors: string[]; // empty = all
-  pageTypes: string[]; // "home" | "article" | "category" | "search" | "author" | "tag" | "law" | "lawyer"
+  countries: string[];
+  languages: string[];
+  categories: string[];
+  tags: string[];
+  pageTypes: string[];
+  deviceTypes: string[];
+  loggedUsers: "all" | "logged-in" | "guests";
+  dateRange?: { start?: string; end?: string };
 }
 
-/** Runtime statistics per banner */
+/** Runtime statistics per ad */
 export interface AdStats {
   impressions: number;
   clicks: number;
+  ctr: number;
   lastShown?: string;
   lastClicked?: string;
+  dailyStats?: { date: string; impressions: number; clicks: number }[];
 }
 
 export interface AdminAd {
@@ -382,21 +399,25 @@ export interface AdminAd {
   name: string;
   enabled: boolean;
   adType: AdType;
-  /** Banner (custom) fields */
+  /** Size */
+  size: AdSize;
+  /** Banner fields */
   title?: string;
   subtitle?: string;
   cta?: string;
   gradient?: string;
-  image?: string; // URL or data URI
+  image?: string;
   linkUrl?: string;
   openInNew?: boolean;
-  startAt?: string; // ISO date
-  endAt?: string; // ISO date
+  /** Scheduling */
+  startAt?: string;
+  endAt?: string;
   priority?: number;
+  weight?: number;
   /** AdSense fields */
   slotId?: string;
   format?: AdSenseFormat;
-  /** HTML code snippet fields */
+  /** HTML/script fields */
   htmlCode?: string;
   /** Shared targeting & stats */
   devices: AdTargetDevices;
@@ -405,45 +426,50 @@ export interface AdminAd {
 }
 
 /** A fixed placement slot in the site UI */
-export type AdPlacementType = "adsense" | "banner" | "html" | "none";
+export type AdPlacementType = "adsense" | "banner" | "html" | "script" | "none";
 
 export interface AdminAdPlacement {
   key: string;
-  label: string; // Arabic label
+  label: string;
+  page: string;
+  description: string;
+  recommendedSize: AdSize;
   type: AdPlacementType;
   enabled: boolean;
-  /** Which ad id is bound (for banner/html). For adsense, uses global adsense config. */
   adId?: string;
 }
 
 export interface AdminHtmlCode {
   id: string;
   name: string;
-  code: string; // raw HTML/JS
+  code: string;
   enabled: boolean;
-  location: string; // human label of where it is injected
+  location: string;
 }
 
 export interface AdminAdSenseConfig {
   enabled: boolean;
   publisherId: string;
-  verificationCode: string; // meta/verification snippet
-  autoAdsCode: string; // full auto-ads snippet
+  verificationCode: string;
+  autoAdsCode: string;
   autoAdsEnabled: boolean;
-  /** Which page types AdSense appears on */
+  autoAdsMaxHeight: number;
+  adSizeOptimization: boolean;
   pages: {
     home: boolean;
     articles: boolean;
     categories: boolean;
     search: boolean;
-    authors: boolean;
-    tags: boolean;
+    lawyers: boolean;
+    laws: boolean;
+    services: boolean;
+    contact: boolean;
   };
 }
 
 export interface AdminActivityLogEntry {
   id: string;
-  entity: "banner" | "placement" | "html" | "adsense" | "settings" | "analytics" | "seo";
+  entity: "ad" | "placement" | "html" | "adsense" | "settings" | "analytics" | "seo";
   entityId: string;
   actor: string;
   action: "create" | "update" | "delete" | "restore";
@@ -457,6 +483,11 @@ export interface AdminPerformance {
   loadOnScroll: boolean;
   webpBanners: boolean;
   deferNonCriticalJs: boolean;
+  maxAdsPerPage: number;
+  adRefreshInterval: number;
+  stickyAdsEnabled: boolean;
+  stickyAdsHeight: number;
+  consentRequired: boolean;
 }
 
 export interface AdminFloatingAI {
@@ -483,6 +514,7 @@ export interface SerializableLaw {
   color: string;
   category?: string;
   source?: string;
+  status?: string;
 }
 
 export interface SerializableService {
@@ -514,6 +546,15 @@ export type AdminUser = {
   createdAt: string;
   lastLogin?: string;
   avatar?: string;
+  phone?: string;
+  status?: "pending" | "approved" | "rejected";
+  notes?: string;
+};
+
+export type LawPageTab = {
+  id: string;
+  name: string;
+  filterCategory?: string; // Show laws matching this category (empty=all)
 };
 
 export type AdminData = {
@@ -531,9 +572,12 @@ export type AdminData = {
   specializations: string[];
   sampleArticles: Record<string, SampleArticle[]>;
   articleBodies: Record<string, ArticleBlock[]>;
+  articleHtml: Record<string, string>;
   categories: { id: string; name: string; icon: string }[];
+  lawPageTabs: LawPageTab[];
   hero: AdminHero;
   footer: AdminFooter;
+  partners: { id: string; name: string; title: string; icon: string; url: string }[];
   seo: AdminSeo;
   analytics: AnalyticsSettings;
   theme: AdminTheme;
@@ -547,6 +591,8 @@ export type AdminData = {
   contact: AdminContact;
   users: AdminUser[];
   roles: AdminRole[];
+  registrationEnabled: boolean;
+  lawTypeVisibility: Record<string, boolean>;
   adminAuth: {
     username: string;
     passwordHash: string;
@@ -554,13 +600,6 @@ export type AdminData = {
     sessionExpiry: number;
   };
 };
-
-/** SHA‑256 hash via Web Crypto API */
-export async function hashPassword(password: string): Promise<string> {
-  const enc = new TextEncoder();
-  const buf = await crypto.subtle.digest("SHA-256", enc.encode(password));
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 /** Generate a cryptographically‑secure token */
 export function secureToken(): string {
@@ -601,6 +640,7 @@ export function buildDefaults(): AdminData {
     specializations: [...defaultSpecializations],
     sampleArticles: JSON.parse(JSON.stringify(defaultSampleArticles)),
     articleBodies: JSON.parse(JSON.stringify(defaultArticleBodies)),
+    articleHtml: JSON.parse(JSON.stringify(defaultArticleHtml)),
     categories: [
       { id: "civil", name: "القانون المدني", icon: "Scale" },
       { id: "penal", name: "قانون العقوبات", icon: "Gavel" },
@@ -611,13 +651,20 @@ export function buildDefaults(): AdminData {
       { id: "investment", name: "قانون الاستثمار", icon: "Landmark" },
       { id: "commercial", name: "القانون التجاري", icon: "Briefcase" },
     ],
+    lawPageTabs: [
+      { id: "all", name: "القوانين العراقية" },
+      { id: "decisions", name: "قرارات محكمة التمييز", filterCategory: "cassation" },
+      { id: "regulations", name: "التعليمات", filterCategory: "regulation" },
+      { id: "systems", name: "الأنظمة", filterCategory: "system" },
+    ],
     hero: {
       badge: "المنصة القانونية الأولى في العراق",
-      title: "دليلك الذكي للقوانين العراقية",
+      title: "دليلك الذكي للقوانين",
+      titleGradient: "العراقية والمحامين",
       subtitle:
         "ابحث في آلاف المواد القانونية، اعثر على أفضل المحامين، واحصل على استشارة قانونية موثوقة.",
-      btnPrimary: "ابحث عن محامٍ",
-      btnSecondary: "تصفح القوانين",
+      btnPrimary: "تصفح القوانين",
+      btnSecondary: "ابحث عن محامٍ",
     },
     footer: {
       description:
@@ -635,10 +682,16 @@ export function buildDefaults(): AdminData {
         youtube: "https://youtube.com/@qanuni",
       },
       legalLinks: [
-        { label: "سياسة الخصوصية", href: "/privacy" },
-        { label: "شروط الاستخدام", href: "/terms" },
+        { label: "سياسة الخصوصية", href: "/legal/privacy" },
+        { label: "شروط الاستخدام", href: "/legal/terms" },
       ],
     },
+    partners: [
+      { id: "p1", name: "وزارة العدل العراقية", title: "شريك استراتيجي", icon: "Landmark", url: "#" },
+      { id: "p2", name: "مجلس القضاء الأعلى", title: "شريك مؤسسي", icon: "Scale", url: "#" },
+      { id: "p3", name: "نقابة المحامين العراقيين", title: "شريك رسمي", icon: "Users", url: "#" },
+      { id: "p4", name: "هيئة ال찡اف العراقية", title: "شريك مؤسسي", icon: "ShieldCheck", url: "#" },
+    ],
     seo: seoDefaults,
     analytics: analyticsDefaults,
     theme: {
@@ -649,38 +702,36 @@ export function buildDefaults(): AdminData {
       darkMode: false,
     },
     ads: [
-      {
-        id: "ad1",
-        name: "استشارة قانونية مجانية",
-        title: "استشارة قانونية مجانية",
-        subtitle: "احصل على استشارتك الأولى مجاناً مع أفضل المحامين",
-        cta: "احجز الآن",
-        gradient: "from-blue-600 to-indigo-700",
-        enabled: true,
-        adType: "custom",
-        linkUrl: "#contact",
-        openInNew: false,
-        priority: 5,
-        devices: { desktop: true, tablet: true, mobile: true },
-        targeting: { countries: [], languages: [], categories: [], tags: [], authors: [], pageTypes: [] },
-        stats: { impressions: 0, clicks: 0 },
-      },
-      {
-        id: "ad2",
-        name: "دليل المحامين المعتمدين",
-        title: "دليل المحامين المعتمدين",
-        subtitle: "أكثر من 5000 محامٍ موثق في جميع المحافظات العراقية",
-        cta: "تصفح المحامين",
-        gradient: "from-amber-500 to-orange-600",
-        enabled: true,
-        adType: "custom",
-        linkUrl: "/lawyers",
-        openInNew: false,
-        priority: 4,
-        devices: { desktop: true, tablet: true, mobile: true },
-        targeting: { countries: [], languages: [], categories: [], tags: [], authors: [], pageTypes: [] },
-        stats: { impressions: 0, clicks: 0 },
-      },
+      // ── Leaderboard 728×90 ──
+      { id: "ad-lb-1", name: "استشارة قانونية مجانية", title: "استشارة قانونية مجانية", subtitle: "احصل على استشارتك الأولى مجاناً مع أفضل المحامين", cta: "احجز الآن", gradient: "from-blue-600 to-indigo-700", enabled: true, adType: "custom-gradient", size: "leaderboard", linkUrl: "#contact", openInNew: false, priority: 5, weight: 3, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 1240, clicks: 89, ctr: 7.2, dailyStats: [] } },
+      { id: "ad-lb-2", name: "دليل المحامين المعتمدين", title: "دليل المحامين المعتمدين", subtitle: "أكثر من 5000 محامٍ موثق في جميع المحافظات العراقية", cta: "تصفح المحامين", gradient: "from-emerald-500 to-teal-600", enabled: true, adType: "custom-gradient", size: "leaderboard", linkUrl: "/lawyers", openInNew: false, priority: 4, weight: 2, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 870, clicks: 54, ctr: 6.2, dailyStats: [] } },
+      { id: "ad-lb-3", name: "القوانين العراقية النافذة", title: "القوانين العراقية النافذة", subtitle: "جميع القوانين في مكان واحد", cta: "تصفح القوانين", gradient: "from-violet-500 to-purple-700", enabled: true, adType: "custom-gradient", size: "leaderboard", linkUrl: "/laws", openInNew: false, priority: 3, weight: 2, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 650, clicks: 38, ctr: 5.8, dailyStats: [] } },
+      // ── Large Leaderboard 970×90 ──
+      { id: "ad-llb-1", name: "مكتب المحاماة المتقدم", title: "مكتب المحاماة المتقدم", subtitle: "خبرة تمتد لأكثر من 20 عاماً في القانون المدني", cta: "تواصل معنا", gradient: "from-amber-500 to-orange-600", enabled: true, adType: "custom-gradient", size: "large-leaderboard", linkUrl: "/law-firms", openInNew: false, priority: 4, weight: 2, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 530, clicks: 31, ctr: 5.8, dailyStats: [] } },
+      { id: "ad-llb-2", name: "خدمات التوثيق القانوني", title: "خدمات التوثيق القانوني", subtitle: "توثيق العقود والمحاضر الرسمية", cta: "اطلب الخدمة", gradient: "from-rose-500 to-pink-600", enabled: true, adType: "custom-gradient", size: "large-leaderboard", linkUrl: "/services", openInNew: false, priority: 3, weight: 1, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 320, clicks: 18, ctr: 5.6, dailyStats: [] } },
+      // ── Billboard 970×250 ──
+      { id: "ad-bb-1", name: "منصة قانوني", title: "منصة قانوني", subtitle: "دليلك الذكي للقوانين العراقية — أكثر من 100,000 مادة قانونية و5000 محامٍ معتمد", cta: "ابدأ الآن", gradient: "from-blue-600 via-indigo-600 to-purple-700", enabled: true, adType: "custom-gradient", size: "billboard", linkUrl: "/", openInNew: false, priority: 6, weight: 3, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 2100, clicks: 156, ctr: 7.4, dailyStats: [] } },
+      { id: "ad-bb-2", name: "مركز الدومز للقانون", title: "مركز الدومز للقانون", subtitle: "نقدم أفضل الخدمات القانونية في بغداد — استشارات، توثيق، تمثيل قضائي", cta: "تواصل الآن", gradient: "from-emerald-600 via-teal-500 to-cyan-600", enabled: true, adType: "custom-gradient", size: "billboard", linkUrl: "/law-firms", openInNew: false, priority: 5, weight: 2, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 980, clicks: 67, ctr: 6.8, dailyStats: [] } },
+      // ── Medium Rectangle 300×250 ──
+      { id: "ad-mr-1", name: "دورة القانون المدني", title: "دورة في القانون المدني", subtitle: "تعلم أساسيات القانون المدني العراقي", cta: "سجّل الآن", gradient: "from-sky-500 to-blue-600", enabled: true, adType: "custom-gradient", size: "medium-rectangle", linkUrl: "/services", openInNew: false, priority: 4, weight: 2, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 420, clicks: 28, ctr: 6.7, dailyStats: [] } },
+      { id: "ad-mr-2", name: "حقوق العامل", title: "حقوق العامل", subtitle: "هل تعرف حقوقك كعامل في القانون العراقي؟", cta: "اقرأ المزيد", gradient: "from-lime-500 to-green-600", enabled: true, adType: "custom-gradient", size: "medium-rectangle", linkUrl: "/blog", openInNew: false, priority: 3, weight: 2, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 380, clicks: 22, ctr: 5.8, dailyStats: [] } },
+      { id: "ad-mr-3", name: "قانون المرور الجديد", title: "قانون المرور الجديد", subtitle: "التعديلات الأخيرة على قانون المرور العراقي", cta: "اعرف تفاصيلك", gradient: "from-yellow-500 to-amber-600", enabled: true, adType: "custom-gradient", size: "medium-rectangle", linkUrl: "/laws", openInNew: false, priority: 3, weight: 1, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 290, clicks: 15, ctr: 5.2, dailyStats: [] } },
+      { id: "ad-mr-4", name: "الاستشارة القانونية", title: "الاستشارة القانونية", subtitle: "احصل على رأي قانوني متخصص", cta: "ابدأ الآن", gradient: "from-fuchsia-500 to-pink-600", enabled: true, adType: "custom-gradient", size: "medium-rectangle", linkUrl: "#contact", openInNew: false, priority: 4, weight: 2, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 350, clicks: 20, ctr: 5.7, dailyStats: [] } },
+      // ── Large Rectangle 336×280 ──
+      { id: "ad-lr-1", name: "أبحاث قانونية", title: "أبحاث قانونية", subtitle: "أبحاث ودراسات قانونية متخصصة في القانون العراقي", cta: "حمّل البحث", gradient: "from-indigo-500 to-violet-600", enabled: true, adType: "custom-gradient", size: "large-rectangle", linkUrl: "/blog", openInNew: false, priority: 3, weight: 2, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 270, clicks: 14, ctr: 5.2, dailyStats: [] } },
+      // ── Skyscraper 160×600 ──
+      { id: "ad-sk-1", name: "قانوني", title: "قانوني", subtitle: "منصتك القانونية الموثوقة — استشارات، قوانين، محامين", cta: "ابدأ", gradient: "from-teal-500 to-emerald-600", enabled: true, adType: "custom-gradient", size: "skyscraper", linkUrl: "/", openInNew: false, priority: 4, weight: 2, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 190, clicks: 11, ctr: 5.8, dailyStats: [] } },
+      // ── Wide Skyscraper 300×600 ──
+      { id: "ad-wsk-1", name: "دليل القوانين العراقية", title: "دليل شامل للقوانين العراقية", subtitle: "جميع القوانين النافذة مع شروحات ومراجع قانونية موثوقة", cta: "ابدأ التصفح", gradient: "from-cyan-500 to-blue-600", enabled: true, adType: "custom-gradient", size: "wide-skyscraper", linkUrl: "/laws", openInNew: false, priority: 4, weight: 2, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 240, clicks: 16, ctr: 6.7, dailyStats: [] } },
+      // ── Mobile Banner 320×50 ──
+      { id: "ad-mob-1", name: "قانوني — دليلك القانوني", title: "قانوني — دليلك القانوني", subtitle: "", cta: "تحميل", gradient: "from-blue-500 to-indigo-600", enabled: true, adType: "custom-gradient", size: "mobile-banner", linkUrl: "/", openInNew: false, priority: 5, weight: 3, devices: { desktop: false, tablet: false, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 680, clicks: 45, ctr: 6.6, dailyStats: [] } },
+      // ── Responsive ──
+      { id: "ad-resp-1", name: "الاستشارات القانونية", title: "الاستشارات القانونية", subtitle: "احصل على استشارة قانونية من أفضل المحامين", cta: "احجز استشارتك", gradient: "from-rose-500 to-red-600", enabled: true, adType: "custom-gradient", size: "responsive", linkUrl: "#contact", openInNew: false, priority: 5, weight: 2, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 560, clicks: 35, ctr: 6.3, dailyStats: [] } },
+      { id: "ad-resp-2", name: "الخط الساخن القانوني", title: "الخط الساخن القانوني", subtitle: "الخط الساخن المجاني للاستشارات القانونية", cta: "اتصل الآن", gradient: "from-orange-500 to-red-500", enabled: true, adType: "custom-gradient", size: "responsive", linkUrl: "#contact", openInNew: false, priority: 4, weight: 2, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 410, clicks: 26, ctr: 6.3, dailyStats: [] } },
+      // ── Sticky Bottom ──
+      { id: "ad-stky-1", name: "حمّل تطبيق قانوني", title: "حمّل تطبيق قانوني", subtitle: "متاح على Android و iOS", cta: "تحميل مجاني", gradient: "from-blue-600 to-violet-600", enabled: true, adType: "custom-gradient", size: "sticky-bottom", linkUrl: "/", openInNew: false, priority: 5, weight: 3, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 780, clicks: 52, ctr: 6.7, dailyStats: [] } },
+      // ── Native ──
+      { id: "ad-nat-1", name: "محامٍ تجاري متخصص", title: "محامٍ متخصص في القانون التجاري", subtitle: "خبرة 15 عاماً في التعاملات التجارية الكبرى", cta: "تواصل", gradient: "from-emerald-500 to-green-600", enabled: true, adType: "custom-gradient", size: "native", linkUrl: "/lawyers", openInNew: false, priority: 4, weight: 2, devices: { desktop: true, tablet: true, mobile: true }, targeting: { countries: [], languages: [], categories: [], tags: [], pageTypes: [], deviceTypes: [], loggedUsers: "all" }, stats: { impressions: 310, clicks: 19, ctr: 6.1, dailyStats: [] } },
     ],
     adsense: {
       enabled: false,
@@ -688,33 +739,54 @@ export function buildDefaults(): AdminData {
       verificationCode: "",
       autoAdsCode: "",
       autoAdsEnabled: false,
+      autoAdsMaxHeight: 0,
+      adSizeOptimization: true,
       pages: {
         home: true,
         articles: true,
         categories: true,
         search: true,
-        authors: true,
-        tags: true,
+        lawyers: true,
+        laws: true,
+        services: true,
+        contact: true,
       },
     },
     adPlacements: [
-      { key: "top-site", label: "أعلى الموقع", type: "adsense", enabled: true },
-      { key: "below-header", label: "أسفل الهيدر", type: "adsense", enabled: true },
-      { key: "in-article-2", label: "داخل المقال بعد الفقرة 2", type: "adsense", enabled: true },
-      { key: "in-article-5", label: "داخل المقال بعد الفقرة 5", type: "banner", enabled: true },
-      { key: "article-end", label: "نهاية المقال", type: "adsense", enabled: true },
-      { key: "before-comments", label: "قبل التعليقات", type: "banner", enabled: false },
-      { key: "sidebar-top", label: "الشريط الجانبي أعلى", type: "adsense", enabled: true },
-      { key: "sidebar-mid", label: "الشريط الجانبي وسط", type: "banner", enabled: true },
-      { key: "footer", label: "الفوتر", type: "html", enabled: true },
+      { key: "top-banner", label: "أعلى الموقع", page: "الكل", description: "أسفل الهيدر — leaderboard", recommendedSize: "leaderboard", type: "banner", enabled: true, adId: "ad-lb-1" },
+      { key: "below-hero", label: "أسفل البانر الرئيسي", page: "الرئيسية", description: "تحت قسم Hero — billboard", recommendedSize: "billboard", type: "banner", enabled: true, adId: "ad-bb-1" },
+      { key: "mid-content", label: "وسط المحتوى", page: "الرئيسية", description: "داخل المحتوى — medium-rectangle", recommendedSize: "medium-rectangle", type: "banner", enabled: true, adId: "ad-mr-1" },
+      { key: "laws-top", label: "أعلى القوانين", page: "القوانين", description: "أعلى صفحة القوانين — leaderboard", recommendedSize: "leaderboard", type: "banner", enabled: true, adId: "ad-lb-2" },
+      { key: "laws-inline", label: "داخل شبكة القوانين", page: "القوانين", description: "داخل الشبكة — medium-rectangle", recommendedSize: "medium-rectangle", type: "banner", enabled: true, adId: "ad-mr-3" },
+      { key: "law-detail-top", label: "أعلى تفاصيل القانون", page: "تفاصيل القانون", description: "أعلى الصفحة — large-leaderboard", recommendedSize: "large-leaderboard", type: "banner", enabled: true, adId: "ad-llb-1" },
+      { key: "law-detail-mid", label: "داخل مواد القانون", page: "تفاصيل القانون", description: "بعد المادة الخامسة — responsive", recommendedSize: "responsive", type: "banner", enabled: true, adId: "ad-resp-1" },
+      { key: "lawyers-top", label: "أعلى المحامين", page: "المحامون", description: "أعلى الدليل — leaderboard", recommendedSize: "leaderboard", type: "banner", enabled: true, adId: "ad-lb-3" },
+      { key: "lawyers-inline", label: "داخل شبكة المحامين", page: "المحامون", description: "داخل الشبكة — medium-rectangle", recommendedSize: "medium-rectangle", type: "banner", enabled: true, adId: "ad-mr-2" },
+      { key: "lawyer-promo", label: "إعلان محامٍ ممول", page: "المحامون", description: "داخل القائمة — native", recommendedSize: "native", type: "banner", enabled: true, adId: "ad-nat-1" },
+      { key: "lawyer-sidebar", label: "الشريط الجانبي للمحامي", page: "تفاصيل المحامي", description: "أسفل حجز — skyscraper", recommendedSize: "skyscraper", type: "banner", enabled: true, adId: "ad-sk-1" },
+      { key: "law-firms-top", label: "أعلى المكاتب", page: "المكاتب", description: "أعلى الصفحة — leaderboard", recommendedSize: "leaderboard", type: "banner", enabled: true, adId: "ad-lb-1" },
+      { key: "law-firm-sidebar", label: "الشريط الجانبي للمكتب", page: "تفاصيل المكتب", description: "جانب المحتوى — wide-skyscraper", recommendedSize: "wide-skyscraper", type: "banner", enabled: true, adId: "ad-wsk-1" },
+      { key: "blog-top", label: "أعلى المدونة", page: "المدونة", description: "أعلى الصفحة — leaderboard", recommendedSize: "leaderboard", type: "banner", enabled: true, adId: "ad-lb-2" },
+      { key: "blog-inline", label: "داخل المقالات", page: "المدونة", description: "داخل الشبكة — medium-rectangle", recommendedSize: "medium-rectangle", type: "banner", enabled: true, adId: "ad-mr-4" },
+      { key: "article-mid", label: "داخل المقال", page: "تفاصيل المقال", description: "بعد الفقرة الثالثة — responsive", recommendedSize: "responsive", type: "banner", enabled: true, adId: "ad-resp-2" },
+      { key: "article-end", label: "نهاية المقال", page: "تفاصيل المقال", description: "نهاية المحتوى — large-rectangle", recommendedSize: "large-rectangle", type: "banner", enabled: true, adId: "ad-lr-1" },
+      { key: "services-top", label: "أعلى الخدمات", page: "الخدمات", description: "أعلى الصفحة — large-leaderboard", recommendedSize: "large-leaderboard", type: "banner", enabled: true, adId: "ad-llb-2" },
+      { key: "search-top", label: "أعلى البحث", page: "البحث", description: "أعلى النتائج — large-leaderboard", recommendedSize: "large-leaderboard", type: "banner", enabled: true, adId: "ad-llb-1" },
+      { key: "sticky-mobile", label: "شريط مثبت (جوال)", page: "الكل", description: "أسفل الشاشة — mobile-banner", recommendedSize: "mobile-banner", type: "banner", enabled: true, adId: "ad-mob-1" },
+      { key: "page-footer", label: "أسفل الموقع", page: "الكل", description: "قبل الفوتر — billboard", recommendedSize: "billboard", type: "banner", enabled: true, adId: "ad-bb-2" },
     ],
     htmlCodes: [],
     activityLog: [],
     performance: {
       lazyLoad: true,
-      loadOnScroll: true,
+      loadOnScroll: false,
       webpBanners: true,
       deferNonCriticalJs: true,
+      maxAdsPerPage: 20,
+      adRefreshInterval: 0,
+      stickyAdsEnabled: true,
+      stickyAdsHeight: 60,
+      consentRequired: false,
     },
     floatingAI: {
       greeting: "مرحباً! كيف يمكنني مساعدتك؟",
@@ -739,9 +811,16 @@ export function buildDefaults(): AdminData {
       { id: 'editor', name: 'محرر', permissions: ['manage_articles','manage_content','view_stats'] },
       { id: 'viewer', name: 'مشاهد', permissions: ['view_stats'] },
     ],
+    registrationEnabled: true,
+    lawTypeVisibility: {
+      all: true,
+      decisions: true,
+      regulations: true,
+      systems: true,
+    },
     adminAuth: {
       username: "admin",
-      passwordHash: "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+      passwordHash: "",
       sessionToken: "",
       sessionExpiry: 0,
     },
@@ -771,9 +850,18 @@ export function getAdminData(): AdminData {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return buildDefaults();
     const parsed = JSON.parse(raw) as AdminData;
-    // Merge with defaults to ensure all fields exist (backward compatibility)
     const defaults = buildDefaults();
-    return deepMerge(defaults, parsed);
+    const merged = deepMerge(defaults, parsed);
+    // Force placement types and enabled states from defaults so banner ads always work
+    const defaultPlacementMap = new Map(defaults.adPlacements.map(p => [p.key, p]));
+    merged.adPlacements = merged.adPlacements.map(p => {
+      const def = defaultPlacementMap.get(p.key);
+      if (def) {
+        return { ...p, type: def.type, recommendedSize: def.recommendedSize, enabled: def.enabled, adId: p.adId || def.adId };
+      }
+      return p;
+    });
+    return merged;
   } catch {
     return buildDefaults();
   }
@@ -790,44 +878,73 @@ export function resetAdminData(): AdminData {
   return defaults;
 }
 
-export function getLawsWithIcons(): Law[] {
-  return defaultLaws.map((l) => ({ ...l }));
-}
-
-export function getServicesWithIcons() {
-  return defaultServices.map((s) => ({
-    ...s,
-    icon: serializeIcon(s.icon),
-  }));
-}
-
-export function getFeaturesWithIcons() {
-  return defaultFeatures.map((f) => ({
-    ...f,
-    icon: serializeIcon(f.icon),
-  }));
-}
-
 export function useAdminData() {
-  const [data, setData] = useState<AdminData>(getAdminData);
+  const [data, setData] = useState<AdminData>(buildDefaults);
+
+  // Load the single source of truth (Prisma DB) on mount.
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/data", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (active && d && typeof d === "object") {
+          setData({ ...buildDefaults(), ...(d as Partial<AdminData>) } as AdminData);
+        }
+      })
+      .catch(() => {
+        /* keep defaults if API unavailable */
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Persist every edit to the database (single source of truth).
+  const persist = useCallback((field: keyof AdminData, value: AdminData[keyof AdminData]) => {
+    fetch("/api/admin/data", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ field, value }),
+    }).catch(() => {
+      /* non-fatal */
+    });
+  }, []);
+
+  // Batch persist multiple fields in a single request to avoid race conditions.
+  const persistBatch = useCallback((updates: Record<string, unknown>) => {
+    fetch("/api/admin/data", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: updates }),
+    }).catch(() => {
+      /* non-fatal */
+    });
+  }, []);
 
   const update = useCallback(
     <K extends keyof AdminData>(field: K, value: AdminData[K]) => {
-      setData((prev) => {
-        const next = { ...prev, [field]: value };
-        saveAdminData(next);
-        return next;
-      });
+      setData((prev) => ({ ...prev, [field]: value }));
+      persist(field, value as AdminData[keyof AdminData]);
     },
-    []
+    [persist]
+  );
+
+  // Batch update multiple fields in one request.
+  const updateBatch = useCallback(
+    (updates: Partial<AdminData>) => {
+      setData((prev) => ({ ...prev, ...updates }));
+      persistBatch(updates as Record<string, unknown>);
+    },
+    [persistBatch]
   );
 
   const reset = useCallback(() => {
-    const defaults = resetAdminData();
-    setData(defaults);
+    setData(buildDefaults());
   }, []);
 
-  return { data, update, reset };
+  return { data, update, updateBatch, reset };
 }
 
 export function isAdminLoggedIn(): boolean {
@@ -840,21 +957,6 @@ export function isAdminLoggedIn(): boolean {
   } catch {
     return false;
   }
-}
-
-export async function adminLogin(username: string, password: string): Promise<boolean> {
-  if (typeof window === "undefined") return false;
-  const defaults = buildDefaults();
-  if (username !== defaults.adminAuth.username) return false;
-  const hash = await hashPassword(password);
-  if (hash !== defaults.adminAuth.passwordHash) return false;
-  const expiry = Date.now() + 1000 * 60 * 60 * 24;
-  const token = secureToken();
-  localStorage.setItem(
-    "admin_session",
-    JSON.stringify({ token, expiry })
-  );
-  return true;
 }
 
 export function adminLogout(): void {
@@ -879,11 +981,28 @@ export function recordAdImpression(adId: string): void {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
     const parsed = JSON.parse(raw) as AdminData;
-    const ads = parsed.ads.map((a) =>
-      a.id === adId
-        ? { ...a, stats: { ...a.stats, impressions: a.stats.impressions + 1 } }
-        : a
-    );
+    const today = new Date().toISOString().slice(0, 10);
+    const ads = parsed.ads.map((a) => {
+      if (a.id !== adId) return a;
+      const impressions = a.stats.impressions + 1;
+      const dailyStats = [...(a.stats.dailyStats || [])];
+      const existing = dailyStats.find((d) => d.date === today);
+      if (existing) {
+        existing.impressions++;
+      } else {
+        dailyStats.push({ date: today, impressions: 1, clicks: 0 });
+      }
+      return {
+        ...a,
+        stats: {
+          ...a.stats,
+          impressions,
+          ctr: a.stats.clicks > 0 ? Math.round((a.stats.clicks / impressions) * 1000) / 10 : 0,
+          lastShown: new Date().toISOString(),
+          dailyStats: dailyStats.slice(-30),
+        },
+      };
+    });
     saveAdminData({ ...parsed, ads });
   } catch {
     /* noop */
@@ -896,11 +1015,28 @@ export function recordAdClick(adId: string): void {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
     const parsed = JSON.parse(raw) as AdminData;
-    const ads = parsed.ads.map((a) =>
-      a.id === adId
-        ? { ...a, stats: { ...a.stats, clicks: a.stats.clicks + 1 } }
-        : a
-    );
+    const today = new Date().toISOString().slice(0, 10);
+    const ads = parsed.ads.map((a) => {
+      if (a.id !== adId) return a;
+      const clicks = a.stats.clicks + 1;
+      const dailyStats = [...(a.stats.dailyStats || [])];
+      const existing = dailyStats.find((d) => d.date === today);
+      if (existing) {
+        existing.clicks++;
+      } else {
+        dailyStats.push({ date: today, impressions: 0, clicks: 1 });
+      }
+      return {
+        ...a,
+        stats: {
+          ...a.stats,
+          clicks,
+          ctr: a.stats.impressions > 0 ? Math.round((clicks / a.stats.impressions) * 1000) / 10 : 0,
+          lastClicked: new Date().toISOString(),
+          dailyStats: dailyStats.slice(-30),
+        },
+      };
+    });
     saveAdminData({ ...parsed, ads });
   } catch {
     /* noop */
@@ -909,7 +1045,15 @@ export function recordAdClick(adId: string): void {
 
 export function adCtr(stats?: AdStats): number {
   if (!stats || stats.impressions === 0) return 0;
-  return (stats.clicks / stats.impressions) * 100;
+  return stats.ctr || Math.round((stats.clicks / stats.impressions) * 1000) / 10;
+}
+
+export function isAdActive(ad: AdminAd): boolean {
+  if (!ad.enabled) return false;
+  const now = new Date().toISOString();
+  if (ad.startAt && now < ad.startAt) return false;
+  if (ad.endAt && now > ad.endAt) return false;
+  return true;
 }
 
 export function deviceMatches(devices: AdTargetDevices, ua: string): boolean {

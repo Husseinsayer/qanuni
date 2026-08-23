@@ -28,14 +28,11 @@ import {
 } from "lucide-react";
 import {
   loadEvents,
-  summarize,
   summarizeRange,
   comparePeriods,
   eventsToCsv,
   downloadCsv,
   clearEvents,
-  recordVisit,
-  analyticsDefaults,
   type VisitEvent,
   type AnalyticsSummary,
   type DateRange,

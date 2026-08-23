@@ -1,29 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Star, X, Check, User, MessageCircle, Send, ChevronDown } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Star, Check, MessageCircle, Send } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   getMyReviews, addReply, seedLawyerDemoData, type Review,
 } from "@/lib/lawyer-profiles";
-import { getUserSession } from "@/lib/user-auth";
 
 export default function ReviewsPage() {
-  const router = useRouter();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [replyingId, setReplyingId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const s = getUserSession();
-    if (!s || s.role !== "lawyer") { router.push("/auth/login"); return; }
     seedLawyerDemoData();
     setReviews(getMyReviews());
-  }, [router]);
+  }, []);
 
   const handleReply = (id: string) => {
     if (!replyText.trim()) return;

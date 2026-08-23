@@ -1,6 +1,6 @@
 // ===== RAG Pipeline — Context Builder =====
 // Takes retrieval results → builds structured context with citation tracking.
-import type { RetrievalResult, GenerationContext, ContextFormat, CitationMap, CitationEntry } from "../types";
+import type { RetrievalResult, GenerationContext, ContextFormat, CitationMap } from "../types";
 
 function detectFormat(type: string): ContextFormat {
   switch (type) {

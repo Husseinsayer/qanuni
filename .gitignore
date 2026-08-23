@@ -14,7 +14,8 @@
 .DS_Store
 *.pem
 
-# debug
+# debug / logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -35,6 +36,33 @@ next-env.d.ts
 .vscode/
 .idea/
 
-# opencode
+# opencode / AI
 /.omo/
 /.codegraph/
+/.agents/
+/.claude/
+/.windsurf/
+
+/lib/generated/prisma
+
+# backups
+/backups/
+
+# database
+/dev.db
+/dev.db-journal
+
+# temp / debug files
+*.html
+!app/**/*.html
+*.png
+check-*.js
+check-*.cjs
+check-*.mjs
+debug_*.js
+dbcheck.js
+deploy-ghpages.mjs
+site-data.json
+skills-lock.json
+.installed
+.vercel/

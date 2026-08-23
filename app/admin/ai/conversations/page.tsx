@@ -3,10 +3,9 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { getConversations, deleteConversation } from "@/lib/ai/settings-store";
 import type { Conversation } from "@/lib/ai/types";
-import { Search, Trash2, MessageSquare, Calendar, Star } from "lucide-react";
+import { Search, Trash2, MessageSquare, Star } from "lucide-react";
 import { toast } from "@/lib/admin-toast";
 
 export default function ConversationsPage() {

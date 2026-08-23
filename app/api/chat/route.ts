@@ -16,7 +16,6 @@ type ChatRequest = {
   conversationId?: string;
   debug?: boolean;
   aiConfig?: AIConfig;
-  botInstructions?: BotInstructions;
 };
 
 export async function POST(request: NextRequest) {
@@ -36,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body: ChatRequest = await request.json();
-    const { message, conversationHistory = [], debug = false, aiConfig, botInstructions } = body;
+    const { message, conversationHistory = [], debug = false, aiConfig: _aiConfig } = body;
 
     if (!message || typeof message !== "string") {
       return NextResponse.json({ error: "الرسالة مطلوبة" }, { status: 400 });
@@ -48,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     const startTime = Date.now();
     const config: AIConfig = defaultAIConfig; // Server-side only — never accept apiKey from client
-    const instructions: BotInstructions = botInstructions || defaultBI;
+    const instructions: BotInstructions = defaultBI; // Always use server-side defaults
 
     // === Step 1: Detect dialect ===
     const dialectResult = detectDialect(message);

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -8,7 +7,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { MapPin } from "lucide-react";
-import { toast } from "@/lib/admin-toast";
 import { useAdminContext } from "../admin-context";
 import { pushActivityLog, type AdminAdPlacement } from "@/lib/admin-data";
 
@@ -47,11 +45,10 @@ const TYPE_OPTIONS: { value: AdminAdPlacement["type"]; label: string }[] = [
 
 export default function AdPlacementsPage() {
   const { data, update } = useAdminContext();
-  const [saved, setSaved] = useState(false);
 
   const placements = data.adPlacements;
-  const customAds = data.ads.filter((a) => a.adType === "custom");
-  const htmlAds = data.ads.filter((a) => a.adType === "html");
+  const customAds = data.ads.filter((a) => a.adType === "custom-gradient" || a.adType === "custom-image");
+  const htmlAds = data.ads.filter((a) => a.adType === "html" || a.adType === "script");
 
   const patchPlacement = (
     key: string,

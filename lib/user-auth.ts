@@ -6,7 +6,7 @@ export interface UserAccount {
   email: string;
   phone: string;
   passwordHash: string;
-  role: "user" | "lawyer" | "visitor";
+  role: "user" | "lawyer" | "admin" | "editor" | "visitor";
   createdAt: string;
 }
 

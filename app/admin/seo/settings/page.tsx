@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Save, RotateCcw, Settings, Tag, Share2, Braces, Bot, Image as ImageIcon, ListTree, Zap } from "lucide-react";
+import { Save, Settings, Tag, Share2, Braces, Bot, Image as ImageIcon, ListTree, Zap } from "lucide-react";
 import { toast } from "@/lib/admin-toast";
 import { useAdminContext } from "../../admin-context";
 import { pushActivityLog, type AdminSeo, type SeoSchemaType } from "@/lib/admin-data";

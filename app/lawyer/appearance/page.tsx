@@ -1,38 +1,37 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Palette, Save, Check, Eye, Sun, Moon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getMyLawyerProfile, updateMyProfile, hueOptions } from "@/lib/lawyer-profiles";
-import { getUserSession } from "@/lib/user-auth";
 import type { Lawyer } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
 
 export default function LawyerAppearancePage() {
-  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [profile, setProfile] = useState<Lawyer | null>(null);
   const [selectedHue, setSelectedHue] = useState("from-blue-600 to-indigo-700");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const s = getUserSession();
-    if (!s || s.role !== "lawyer") {
-      router.push("/auth/login");
-      return;
-    }
     const p = getMyLawyerProfile();
     if (p) {
       setProfile(p);
       setSelectedHue(p.hue);
     }
-  }, [router]);
+  }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     updateMyProfile({ hue: selectedHue });
+    try {
+      await fetch("/api/lawyer/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hue: selectedHue }),
+      });
+    } catch { /* silent */ }
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };

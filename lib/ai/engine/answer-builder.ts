@@ -1,12 +1,9 @@
 // ===== Iraqi Legal Assistant - Answer Builder =====
 import type {
-  Message,
   LawReference,
   ConfidenceScore,
-  AnswerSettings,
 } from "../types";
 import { getServerAnswerSettings } from "../server-settings";
-import { getConfidenceColor } from "../scoring/confidence";
 
 // === Answer Sections ===
 export type AnswerSections = {
@@ -113,7 +110,6 @@ export function buildSystemPromptWithContext(
 
 // === Format Confidence Badge ===
 export function formatConfidenceBadge(confidence: ConfidenceScore): string {
-  const color = getConfidenceColor(confidence.level);
   return `🎯 درجة الثقة: ${confidence.overall}% - ${confidence.message}`;
 }
 

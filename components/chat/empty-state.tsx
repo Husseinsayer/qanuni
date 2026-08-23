@@ -1,7 +1,7 @@
 // ===== Iraqi Legal Assistant - Empty State Component =====
 "use client";
 
-import { MessageSquare, Bot, Scale, FileText } from "lucide-react";
+import { MessageSquare, Bot, Scale } from "lucide-react";
 
 type EmptyStateProps = {
   type: "no_conversations" | "no_results" | "welcome" | "error";

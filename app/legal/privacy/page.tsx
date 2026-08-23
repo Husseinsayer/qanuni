@@ -1,5 +1,3 @@
-import { PageHeader } from "@/components/page-header";
-
 export const metadata = {
   title: "سياسة الخصوصية | منصة قانوني",
   description: "سياسة الخصوصية لمنصة قانوني — كيف نجمع ونستخدم بياناتك.",
@@ -8,11 +6,6 @@ export const metadata = {
 export default function PrivacyPage() {
   return (
     <>
-      <PageHeader
-        eyebrow="قانوني"
-        title="سياسة الخصوصية"
-        crumbs={[{ label: "الرئيسية", href: "/" }, { label: "سياسة الخصوصية" }]}
-      />
       <section className="container max-w-3xl pb-20">
         <div className="prose prose-lg rtl:prose-right max-w-none text-foreground/90 leading-relaxed">
           <p className="text-lg text-muted-foreground">

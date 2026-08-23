@@ -2,7 +2,7 @@
 // Strategy: metadata → DB, article → DB, general → RAG, insufficient → AI fallback.
 import type {
   RetrievalResult, GenerationContext, GeneratedAnswer,
-  CitationMap, BotInstructions, AIConfig, Message, ScoredArticle,
+  BotInstructions, AIConfig, Message, ScoredArticle,
 } from "../types";
 import { answerLawMetadata, answerArticleContent } from "./metadata-answers";
 
@@ -10,9 +10,9 @@ export async function generateAnswer(
   context: GenerationContext,
   retrieval: RetrievalResult,
   instructions: BotInstructions,
-  options?: { aiConfig?: AIConfig; conversationHistory?: Message[]; userMessage?: string }
+  _options?: { aiConfig?: AIConfig; conversationHistory?: Message[]; userMessage?: string }
 ): Promise<GeneratedAnswer> {
-  const { classification, articles, matchedLaw, metadataMatches } = retrieval;
+  const { classification, articles, matchedLaw, metadataMatches: _metadataMatches } = retrieval;
 
   // Strategy 1: Metadata question → direct DB answer
   if (classification.type === "law_metadata" && matchedLaw) {
@@ -52,7 +52,7 @@ function buildRAGAnswer(
   retrieval: RetrievalResult,
   instructions: { showPracticalSteps?: boolean; showDisclaimer?: boolean }
 ): GeneratedAnswer {
-  const { articles, classification } = retrieval;
+  const { articles, classification: _classification } = retrieval;
   const lines: string[] = [];
   const warnings: string[] = [];
   const citations = context.citations;

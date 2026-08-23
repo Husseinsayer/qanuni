@@ -1,13 +1,15 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { Search, Scale, BookOpen, Hash, UserRound, ArrowLeft, ShieldCheck } from "lucide-react";
+import { Search, Scale, BookOpen, Hash, UserRound, ShieldCheck } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Counter } from "@/components/ui/counter";
 import { Reveal } from "@/components/reveal";
-import { stats } from "@/lib/data";
+import { useSiteData } from "@/lib/use-site-data";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 const tabs = [
   { id: "law", label: "قانون", icon: Scale, placeholder: "ابحث باسم القانون...", example: "القانون المدني" },
@@ -19,6 +21,9 @@ const tabs = [
 export function Hero() {
   const [tab, setTab] = React.useState<(typeof tabs)[number]["id"]>("law");
   const active = tabs.find((t) => t.id === tab)!;
+  const router = useRouter();
+  const { hero, stats, logo } = useSiteData();
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   return (
     <section className="relative overflow-hidden">
@@ -35,32 +40,32 @@ export function Hero() {
         <div className="text-right">
           <Reveal>
             <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-1.5 text-sm font-semibold text-accent">
-              <ShieldCheck className="size-4" /> منصة قانونية عراقية موثوقة
+              <ShieldCheck className="size-4" /> {hero.badge || "منصة قانونية عراقية موثوقة"}
             </span>
           </Reveal>
 
           <Reveal delay={0.05}>
-            <h1 className="text-4xl font-extrabold leading-[1.5] tracking-tight md:text-6xl md:leading-[1.45]">
-              دليلك الذكي للقوانين
+            <h1 className="text-3xl font-extrabold leading-[1.6] tracking-tight sm:text-4xl md:text-5xl md:leading-[1.45]">
+              {hero.title || "دليلك الذكي للقوانين"}
               <br />
-              <span className="text-gradient">العراقية والمحامين</span>
+              <span className="text-gradient">{hero.titleGradient || "العراقية والمحامين"}</span>
             </h1>
           </Reveal>
 
           <Reveal delay={0.1}>
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-              ابحث في آلاف المواد القانونية، اعثر على أفضل المحامين، واقرأ أحدث المقالات القانونية في مكان واحد.
+            <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
+              {hero.subtitle || "ابحث في آلاف المواد القانونية، اعثر على أفضل المحامين، واقرأ أحدث المقالات القانونية في مكان واحد."}
             </p>
           </Reveal>
 
           <Reveal delay={0.15}>
             <div className="mt-8 flex flex-wrap gap-3">
-              <a href="/laws" className={cn(buttonVariants({ variant: "primary", size: "lg" }), "contents")}>
-                استكشف القوانين
-              </a>
-              <a href="/lawyers" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "contents")}>
-                ابحث عن محام
-              </a>
+              <Link href="/laws" className={cn(buttonVariants({ variant: "primary", size: "lg" }), "contents")}>
+                {hero.btnPrimary || "استكشف القوانين"}
+              </Link>
+              <Link href="/lawyers" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "contents")}>
+                {hero.btnSecondary || "ابحث عن محام"}
+              </Link>
             </div>
           </Reveal>
 
@@ -90,17 +95,15 @@ export function Hero() {
               </div>
               <div className="mt-3 flex items-center gap-2 p-1">
                 <input
+                  ref={searchInputRef}
                   className="hero-search-input h-12 flex-1 rounded-xl bg-transparent px-4 text-sm outline-none placeholder:text-muted-foreground"
                   placeholder={active.placeholder}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
-                      const val = (e.target as HTMLInputElement).value.trim();
+                      const val = searchInputRef.current?.value.trim();
                       if (!val) return;
-                      if (tab === "lawyer") {
-                        window.location.href = `/lawyers`;
-                      } else if (tab === "law" || tab === "article" || tab === "number") {
-                        window.location.href = `/laws`;
-                      }
+                      const q = encodeURIComponent(val);
+                      router.push(tab === "lawyer" ? `/lawyers?q=${q}` : `/laws?q=${q}`);
                     }
                   }}
                 />
@@ -109,14 +112,10 @@ export function Hero() {
                   size="lg"
                   className="gap-2"
                   onClick={() => {
-                    const input = document.querySelector<HTMLInputElement>('.hero-search-input');
-                    const val = input?.value.trim();
+                    const val = searchInputRef.current?.value.trim();
                     if (!val) return;
-                    if (tab === "lawyer") {
-                      window.location.href = `/lawyers`;
-                    } else {
-                      window.location.href = `/laws`;
-                    }
+                    const q = encodeURIComponent(val);
+                    router.push(tab === "lawyer" ? `/lawyers?q=${q}` : `/laws?q=${q}`);
                   }}
                 >
                   <Search className="size-4" /> بحث
@@ -152,7 +151,7 @@ export function Hero() {
               className="absolute -top-[18rem] -left-24"
             >
               <img
-                src="/logo.png"
+                src={logo || "/qanuni/logo.png"}
                 alt="قانوني"
                 loading="lazy"
                 className="w-[30rem] drop-shadow-2xl"

@@ -1,0 +1,626 @@
+// Prisma schema for Iraqi Legal Platform (Qanuni)
+// Uses SQLite for development — switch to PostgreSQL:
+// 1. Change provider to "postgresql"
+// 2. Update DATABASE_URL in .env
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ===== Users & Auth =====
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  phone         String   @default("")
+  passwordHash  String
+  role          String   @default("user") // user | lawyer | admin | editor
+  isActive      Boolean  @default(true)
+  emailVerified Boolean  @default(false)
+  avatar        String   @default("")
+  status        String   @default("active") // active | pending | approved | rejected
+  activationToken String @default("")
+  resetToken      String @default("")
+  resetTokenExpiry DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions         Session[]
+  messages         Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+  reviews          Review[]
+  lawyer           Lawyer?
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ===== Content =====
+
+model Law {
+  id        String   @id @default(cuid())
+  name      String
+  articles  Int      @default(0)
+  updated   String   @default("")
+  icon      String   @default("Scale")
+  color     String   @default("#1E3A8A")
+  category  String   @default("")
+  source    String   @default("")
+  status    String   @default("نافذ")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Lawyer {
+  id             String   @id @default(cuid())
+  name           String
+  slug           String   @unique
+  city           String
+  specialization String
+  experience     Int      @default(0)
+  rating         Float    @default(0)
+  reviewCount    Int      @default(0)
+  verified       Boolean  @default(false)
+  online         Boolean  @default(false)
+  price          Float    @default(0)
+  gender         String   @default("male")
+  languages      String   @default("[]") // JSON array
+  bio            String   @default("")
+  initials       String   @default("")
+  hue            String   @default("from-blue-600 to-indigo-700")
+  avatar         String   @default("")
+  photoUrl       String   @default("")
+  whatsapp       String   @default("")
+  telegram       String   @default("")
+  facebook       String   @default("")
+  instagram      String   @default("")
+  promoted       Boolean  @default(false)
+  points         Int      @default(0)
+  userId         String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user        User?           @relation(fields: [userId], references: [id])
+  firmMembers LawFirmMember[]
+  reviews     Review[]
+}
+
+model LawFirm {
+  id        String   @id @default(cuid())
+  name      String
+  city      String
+  address   String   @default("")
+  phones    String   @default("[]") // JSON array
+  email     String   @default("")
+  hue       String   @default("from-blue-600 to-indigo-700")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members LawFirmMember[]
+}
+
+model LawFirmMember {
+  lawyerId String
+  firmId   String
+
+  lawyer Lawyer  @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
+  firm   LawFirm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@id([lawyerId, firmId])
+}
+
+model Article {
+  id          String   @id @default(cuid())
+  category    String   @default("")
+  title       String
+  excerpt     String   @default("")
+  content     String   @default("")
+  author      String   @default("")
+  authorId    String   @default("")
+  date        String   @default("")
+  readingTime Int      @default(5)
+  hue         String   @default("from-blue-400 to-indigo-500")
+  views       Int      @default(0)
+  status      String   @default("draft") // draft | pending | published | rejected
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Service {
+  id        String   @id @default(cuid())
+  title     String
+  icon      String   @default("FileText")
+  desc      String   @default("")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LegalTemplate {
+  id          String    @id @default(cuid())
+  name        String
+  category    String    @default("")
+  description String    @default("")
+  content     String    @default("")
+  variables   String    @default("[]") // JSON array of TemplateVariable
+  keywords    String    @default("[]") // JSON array
+  notes       String    @default("")
+  isActive    Boolean   @default(true)
+  deletedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ===== Alimony Calculator =====
+
+model AlimonySettings {
+  id                       String   @id @default(cuid())
+  enabled                  Boolean  @default(true)
+  defaultCurrency          String   @default("IQD")
+  minAlimonyPercent        Float    @default(20)
+  maxAlimonyPercent        Float    @default(50)
+  housingAllowancePercent  Float    @default(30)
+  educationAllowancePercent Float   @default(15)
+  healthcareAllowancePercent Float  @default(10)
+  enableAutoCalculation    Boolean  @default(true)
+  showLegalBasis           Boolean  @default(true)
+  defaultMaritalStatus     String   @default("married")
+  childAgeLimit            Int      @default(18)
+  childEducationAgeLimit   Int      @default(25)
+  monthlyMinWage           Float    @default(500000)
+  notes                    String   @default("")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+}
+
+model AlimonyCalculation {
+  id                  String   @id @default(cuid())
+  sessionId           String   @default("")
+  payerName           String   @default("")
+  payerIncome         Float    @default(0)
+  payerIncomeSource   String   @default("")
+  recipientType       String   @default("") // wife | child | parent
+  recipientCount      Int      @default(1)
+  maritalStatus       String   @default("married")
+  hasHousing          Boolean  @default(false)
+  housingCost         Float    @default(0)
+  hasEducation        Boolean  @default(false)
+  educationCost       Float    @default(0)
+  hasHealthcare       Boolean  @default(false)
+  healthcareCost      Float    @default(0)
+  specialCircumstances String  @default("[]")
+  result              String   @default("{}")
+  totalAlimony        Float    @default(0)
+  status              String   @default("completed")
+  notes               String   @default("")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// ===== Court Fees Calculator =====
+
+model CourtFeeSettings {
+  id                    String   @id @default(cuid())
+  enabled               Boolean  @default(true)
+  defaultCurrency       String   @default("IQD")
+  minFee                Float    @default(5000)
+  maxFee                Float    @default(500000)
+  percentageThreshold   Float    @default(100000000)
+  feeCalculationMethod  String   @default("percentage") // percentage | fixed | tiered
+  enableReductions      Boolean  @default(true)
+  reductionPercent      Float    @default(50)
+  enableExemptions      Boolean  @default(true)
+  socialSecurityExemption Boolean @default(true)
+  governmentExemption   Boolean  @default(true)
+  notes                 String   @default("")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model CourtFeeCalculation {
+  id                String   @id @default(cuid())
+  sessionId         String   @default("")
+  caseType          String   @default("") // civil | commercial | family | criminal | administrative
+  claimAmount       Float    @default(0)
+  courtLevel        String   @default("") // first | appeal | cassation
+  hasExemption      Boolean  @default(false)
+  exemptionType     String   @default("")
+  reductionApplied  Boolean  @default(false)
+  result            String   @default("{}")
+  totalFee          Float    @default(0)
+  status            String   @default("completed")
+  notes             String   @default("")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model CourtFeeType {
+  id            String   @id @default(cuid())
+  name          String
+  description   String   @default("")
+  caseType      String   @default("civil")
+  fixedFee      Float    @default(0)
+  percentageFee Float    @default(0)
+  minFee        Float    @default(0)
+  maxFee        Float    @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ===== Legal Consultations =====
+
+model LegalConsultationType {
+  id              String   @id @default(cuid())
+  name            String
+  description     String   @default("")
+  category        String   @default("") // family | civil | criminal | commercial | administrative
+  price           Float    @default(0)
+  durationMinutes Int      @default(30)
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  consultations LegalConsultation[]
+}
+
+model LegalConsultation {
+  id              String   @id @default(cuid())
+  typeId          String
+  clientName      String   @default("")
+  clientEmail     String   @default("")
+  clientPhone     String   @default("")
+  subject         String   @default("")
+  description     String   @default("")
+  status          String   @default("pending") // pending | accepted | in_progress | completed | cancelled
+  lawyerId        String?
+  lawyerName      String   @default("")
+  scheduledDate   DateTime?
+  response        String   @default("")
+  price           Float    @default(0)
+  isPaid          Boolean  @default(false)
+  paymentMethod   String   @default("")
+  rating          Int?
+  feedback        String   @default("")
+  notes           String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  consultationType LegalConsultationType @relation(fields: [typeId], references: [id], onDelete: Cascade)
+}
+
+model LegalConsultationSettings {
+  id                      String   @id @default(cuid())
+  enabled                 Boolean  @default(true)
+  allowOnlineBooking      Boolean  @default(true)
+  requirePaymentUpfront   Boolean  @default(false)
+  maxFreeConsultations    Int      @default(1)
+  workingHoursStart       String   @default("09:00")
+  workingHoursEnd         String   @default("17:00")
+  workingDays             String   @default("0,1,2,3,6") // 0=Sunday ... 6=Saturday
+  autoAssignLawyer        Boolean  @default(false)
+  sendNotifications       Boolean  @default(true)
+  notes                   String   @default("")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model LegalProcedure {
+  id                  String    @id @default(cuid())
+  name                String
+  category            String    @default("")
+  shortDescription    String    @default("")
+  detailedDescription String    @default("")
+  steps               String    @default("[]") // JSON array
+  requiredDocuments   String    @default("[]") // JSON array
+  conditions          String    @default("[]") // JSON array
+  estimatedDuration   String    @default("")
+  fees                String    @default("")
+  competentAuthority  String    @default("")
+  governorate         String    @default("")
+  notes               String    @default("")
+  keywords            String    @default("[]") // JSON array
+  isActive            Boolean   @default(true)
+  deletedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  icon      String   @default("FileText")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ===== User Interactions =====
+
+model Message {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  subject    String   @default("")
+  content    String
+  read       Boolean  @default(false)
+  archived   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, receiverId])
+  @@index([receiverId, read])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  lawyerId  String
+  rating    Int
+  content   String   @default("")
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lawyer Lawyer @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
+}
+
+// ===== Site Configuration =====
+
+// ===== Legal Content Sections =====
+
+model CassationDecision {
+  id           String   @id @default(cuid())
+  number       String                            // رقم القرار
+  year         String   @default("")              // سنة القرار
+  date         String   @default("")              // تاريخ الجلسة
+  subject      String                            // الموضوع
+  judgmentType String   @default("")              // نوع الحكم
+  fullText     String   @default("")              // نص القرار الكامل
+  source       String   @default("")              // المصدر
+  category     String   @default("civil")         // civil | criminal | administrative
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Instruction {
+  id               String   @id @default(cuid())
+  number           String                            // رقم التعليمية
+  year             String   @default("")              // سنة الإصدار
+  date             String   @default("")              // تاريخ الإصدار
+  subject          String                            // الموضوع
+  issuingAuthority String   @default("")              // الجهة المصدرة
+  validityStatus   String   @default("active")        // active | suspended | cancelled
+  fullText         String   @default("")              // نص التعليمية الكامل
+  category         String   @default("general")       // general | procedural | ethical | administrative
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model System {
+  id               String   @id @default(cuid())
+  number           String                            // رقم النظام
+  year             String   @default("")              // سنة السريان
+  date             String   @default("")              // تاريخ النشر
+  title            String                            // عنوان النظام
+  issuingAuthority String   @default("")              // الجهة المصدرة
+  scope            String   @default("")              // النطاق
+  fullText         String   @default("")              // نص النظام الكامل
+  category         String   @default("general")       // general | commercial | labor | tax | administrative
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model SiteConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @default("") // JSON value
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SiteHero {
+  id             String @id @default(cuid())
+  badge          String @default("")
+  title          String @default("")
+  titleGradient  String @default("")
+  subtitle       String @default("")
+  btnPrimary     String @default("")
+  btnSecondary   String @default("")
+}
+
+model SiteFooter {
+  id             String   @id @default(cuid())
+  description    String   @default("")
+  newsletterText String   @default("")
+  phone          String   @default("")
+  email          String   @default("")
+  address        String   @default("")
+  workingHours   String   @default("")
+  socials        String   @default("{}") // JSON object
+  legalLinks     String   @default("[]") // JSON array
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model SitePartner {
+  id        String   @id @default(cuid())
+  name      String
+  title     String   @default("")
+  icon      String   @default("Building2")
+  url       String   @default("")
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SiteFeature {
+  id        String   @id @default(cuid())
+  title     String
+  desc      String   @default("")
+  icon      String   @default("ShieldCheck")
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SiteTestimonial {
+  id        String   @id @default(cuid())
+  name      String
+  role      String   @default("")
+  rating    Int      @default(5)
+  text      String
+  initials  String   @default("")
+  hue       String   @default("from-blue-500 to-indigo-600")
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SiteFaq {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ===== Inheritance Calculator =====
+
+model InheritanceRule {
+  id            String   @id @default(cuid())
+  name          String
+  description   String   @default("")
+  category      String   @default("general") // general | spouse | children | parents | siblings | grandparents | special
+  priority      Int      @default(0)
+  isActive      Boolean  @default(true)
+  status        String   @default("draft") // draft | review | approved | published | archived
+  version       Int      @default(1)
+  effectiveFrom String   @default("") // date string
+  effectiveTo   String   @default("") // empty = still active
+  conditions    String   @default("[]") // JSON array of conditions
+  calculation   String   @default("{}") // JSON calculation parameters
+  notes         String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  ruleArticles InheritanceRuleArticle[]
+}
+
+model InheritanceRuleArticle {
+  id         String  @id @default(cuid())
+  ruleId     String
+  lawId      String
+  articleId  String
+  articleNum Int     @default(0)
+  note       String  @default("")
+
+  rule InheritanceRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+}
+
+model InheritanceTestCase {
+  id           String   @id @default(cuid())
+  name         String
+  description  String   @default("")
+  inputs       String   @default("{}") // JSON - test inputs
+  expected     String   @default("{}") // JSON - expected result
+  actual       String   @default("{}") // JSON - actual result (filled after run)
+  status       String   @default("pending") // pending | pass | fail
+  lastRunAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model InheritanceCalculation {
+  id             String   @id @default(cuid())
+  sessionId      String   @default("") // anonymous session
+  deceasedGender String   @default("")
+  deathDate      String   @default("")
+  legalSystem    String   @default("") // islamic | civil | mixed
+  totalEstate    Float    @default(0)
+  debts          Float    @default(0)
+  wills          Float    @default(0)
+  netEstate      Float    @default(0)
+  answers        String   @default("{}") // JSON - all wizard answers
+  result         String   @default("{}") // JSON - calculation result
+  status         String   @default("draft") // draft | completed | needs_review | needs_lawyer
+  lawyerId       String?  // recommended lawyer
+  notes          String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  heirs InheritanceHeir[]
+}
+
+model InheritanceHeir {
+  id              String   @id @default(cuid())
+  calculationId   String
+  name            String   @default("")
+  relationship    String   @default("") // spouse | son | daughter | father | mother | brother | sister | etc
+  gender          String   @default("")
+  isAlive         Boolean  @default(true)
+  isDeceased      Boolean  @default(false)
+  deceasedBefore  Boolean  @default(false)
+  hasChildren     Boolean  @default(false)
+  fraction        String   @default("") // e.g. "1/8", "1/4", "1/2"
+  percentage      Float    @default(0)
+  amount          Float    @default(0)
+  isExcluded      Boolean  @default(false)
+  excludeReason   String   @default("")
+  legalBasis      String   @default("") // explanation text
+  ruleIds         String   @default("[]") // JSON array of rule IDs applied
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  calculation InheritanceCalculation @relation(fields: [calculationId], references: [id], onDelete: Cascade)
+}
+
+model InheritanceStopCase {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  condition   String   @default("") // JavaScript condition string
+  message     String   @default("") // user-facing message
+  action      String   @default("stop") // stop | lawyer | review
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model InheritanceQuestion {
+  id          String   @id @default(cuid())
+  step        Int
+  field       String
+  question    String
+  type        String   @default("boolean") // boolean | select | number | text
+  options     String   @default("[]") // JSON array of {value, label}
+  condition   String   @default("") // JSON {field, operator, value} - when to show
+  isRequired  Boolean  @default(false)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

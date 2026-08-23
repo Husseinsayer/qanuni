@@ -38,13 +38,21 @@ import {
   Database,
   CreditCard,
   Mail,
+  Calculator,
+  Link2,
+  TreePine,
+  AlertTriangle,
+  TestTube,
+  Baby,
+  Banknote,
+  MessageSquare,
+  Award,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AdminDataProvider } from "./admin-context";
 import { ToastProvider } from "@/components/ui/toast";
 import { useTheme } from "next-themes";
-import { isAdminLoggedIn, adminLogout } from "@/lib/admin-data";
+import { useSession, signOut } from "next-auth/react";
 
 type NavChild = { label: string; href: string; icon: LucideIcon };
 type NavGroup = {
@@ -67,71 +75,57 @@ const navGroups: NavGroup[] = [
     defaultOpen: true,
     children: [
       { label: "المحامون", href: "/admin/lawyers", icon: Users },
-      { label: "إدارة الترويج", href: "/admin/promotions", icon: Megaphone },
-      { label: "الخطط والاشتراكات", href: "/admin/plans", icon: CreditCard },
       { label: "المقالات", href: "/admin/articles", icon: FileText },
       { label: "القوانين", href: "/admin/laws", icon: Scale },
       { label: "المكاتب", href: "/admin/law-firms", icon: Building2 },
-      { label: "المحتوى", href: "/admin/content", icon: ScrollText },
+      { label: "قرارات محكمة التمييز", href: "/admin/cassation", icon: Scale },
+      { label: "التعليمات", href: "/admin/instructions", icon: FileText },
+      { label: "الأنظمة", href: "/admin/systems", icon: ScrollText },
+      { label: "الترويج", href: "/admin/promotions", icon: Megaphone },
+      { label: "الخطط والاشتراكات", href: "/admin/plans", icon: CreditCard },
+      { label: "النقاط والمكافآت", href: "/admin/rewards", icon: Award },
+      { label: "صفحات المحتوى", href: "/admin/content", icon: ScrollText },
     ],
   },
   {
-    label: "التحليلات",
-    icon: BarChart3,
-    defaultOpen: true,
-    children: [
-      { label: "لوحة التحليلات", href: "/admin/analytics", icon: BarChart3 },
-      { label: "إعدادات التحليلات", href: "/admin/analytics/settings", icon: Settings },
-    ],
-  },
-  {
-    label: "كبار المسئولين (SEO)",
-    icon: Search,
-    defaultOpen: true,
-    children: [
-      { label: "لوحة SEO", href: "/admin/seo", icon: Search },
-      { label: "إعدادات SEO", href: "/admin/seo/settings", icon: Settings },
-      { label: "محلل المحتوى", href: "/admin/seo/content", icon: Search },
-      { label: "أدوات SEO", href: "/admin/seo/tools", icon: Settings },
-      { label: "Local SEO", href: "/admin/seo/local", icon: MapPin },
-    ],
-  },
-  {
-    label: "الإعلانات",
-    icon: Megaphone,
+    label: "حاسبة الميراث",
+    icon: Calculator,
     defaultOpen: false,
     children: [
-      { label: "إعدادات الإعلانات", href: "/admin/ads", icon: Megaphone },
-      { label: "أماكن الإعلانات", href: "/admin/ad-placements", icon: MapPin },
-      { label: "البنرات", href: "/admin/banners", icon: Megaphone },
-      { label: "أكواد HTML", href: "/admin/html-codes", icon: Code2 },
+      { label: "الإعدادات العامة", href: "/admin/inheritance", icon: Settings },
+      { label: "قواعد الحساب", href: "/admin/inheritance/rules", icon: Scale },
+      { label: "ربط القوانين", href: "/admin/inheritance/linking", icon: Link2 },
+      { label: "شجرة الأسئلة", href: "/admin/inheritance/questions", icon: TreePine },
+      { label: "حالات الإيقاف", href: "/admin/inheritance/stop-cases", icon: AlertTriangle },
+      { label: "حالات الاختبار", href: "/admin/inheritance/test-cases", icon: TestTube },
     ],
   },
   {
-    label: "النظام",
-    icon: Settings,
+    label: "حاسبة النفقة",
+    icon: Baby,
     defaultOpen: false,
     children: [
-      { label: "سجل العمليات", href: "/admin/activity-log", icon: History },
-      { label: "المستخدمون", href: "/admin/users", icon: Shield },
-      { label: "المظهر", href: "/admin/theme", icon: Palette },
-      { label: "الإعدادات", href: "/admin/settings", icon: Settings },
-      { label: "نسخ احتياطي واستعادة", href: "/admin/backup", icon: Database },
+      { label: "الإعدادات العامة", href: "/admin/alimony", icon: Settings },
+      { label: "قواعد الحساب", href: "/admin/alimony/rules", icon: Scale },
     ],
   },
   {
-    label: "المساعد القانوني",
-    icon: MessageCircle,
+    label: "الرسوم القضائية",
+    icon: Banknote,
     defaultOpen: false,
     children: [
-      { label: "إعدادات المساعد", href: "/admin/ai/settings", icon: Settings },
-      { label: "الأسئلة الشائعة", href: "/admin/ai/questions", icon: FileText },
-      { label: "المظهر والردود", href: "/admin/ai/appearance", icon: Palette },
-      { label: "إعدادات الإجابات", href: "/admin/ai/answer-settings", icon: Settings },
-      { label: "درجة الثقة", href: "/admin/ai/confidence", icon: BarChart3 },
-      { label: "المحادثات", href: "/admin/ai/conversations", icon: History },
-      { label: "التحليلات", href: "/admin/ai/analytics", icon: BarChart3 },
-      { label: "التحقق والتجربة", href: "/admin/ai/debug", icon: Code2 },
+      { label: "الإعدادات العامة", href: "/admin/court-fees", icon: Settings },
+      { label: "أنواع Cases", href: "/admin/court-fees/case-types", icon: FileText },
+    ],
+  },
+  {
+    label: "الاستشارات القانونية",
+    icon: MessageSquare,
+    defaultOpen: false,
+    children: [
+      { label: "لوحة الاستشارات", href: "/admin/consultations", icon: LayoutDashboard },
+      { label: "أنواع الاستشارات", href: "/admin/consultations/types", icon: FileText },
+      { label: "الإعدادات", href: "/admin/consultations/settings", icon: Settings },
     ],
   },
   {
@@ -151,13 +145,63 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "البريد الإلكتروني",
-    icon: Mail,
+    label: "التحليلات",
+    icon: BarChart3,
+    defaultOpen: true,
+    children: [
+      { label: "لوحة التحليلات", href: "/admin/analytics", icon: BarChart3 },
+      { label: "إعدادات التحليلات", href: "/admin/analytics/settings", icon: Settings },
+    ],
+  },
+  {
+    label: "المساعد القانوني",
+    icon: MessageCircle,
     defaultOpen: false,
     children: [
-      { label: "الإعدادات", href: "/admin/email", icon: Settings },
+      { label: "إعدادات المساعد", href: "/admin/ai/settings", icon: Settings },
+      { label: "الأسئلة الشائعة", href: "/admin/ai/questions", icon: FileText },
+      { label: "المحادثات", href: "/admin/ai/conversations", icon: History },
+      { label: "التحليلات", href: "/admin/ai/analytics", icon: BarChart3 },
+      { label: "التحقق والتجربة", href: "/admin/ai/debug", icon: Code2 },
+    ],
+  },
+  {
+    label: "كبار المسئولين (SEO)",
+    icon: Search,
+    defaultOpen: true,
+    children: [
+      { label: "لوحة SEO", href: "/admin/seo", icon: Search },
+      { label: "إعدادات SEO", href: "/admin/seo/settings", icon: Settings },
+      { label: "محلل المحتوى", href: "/admin/seo/content", icon: Search },
+      { label: "أدوات SEO", href: "/admin/seo/tools", icon: Settings },
+      { label: "Local SEO", href: "/admin/seo/local", icon: MapPin },
+    ],
+  },
+  {
+    label: "الإعلانات",
+    icon: Megaphone,
+    defaultOpen: false,
+    children: [
+      { label: "لوحة الإعلانات", href: "/admin/ads/dashboard", icon: BarChart3 },
+      { label: "الحملات الإعلانية", href: "/admin/ads/campaigns", icon: Megaphone },
+      { label: "أماكن الإعلانات", href: "/admin/ads/placements", icon: MapPin },
+      { label: "أكواد الإعلانات", href: "/admin/ads/codes", icon: Code2 },
+      { label: "إعدادات الإعلانات", href: "/admin/ads/settings", icon: Settings },
+    ],
+  },
+  {
+    label: "النظام",
+    icon: Settings,
+    defaultOpen: false,
+    children: [
+      { label: "سجل العمليات", href: "/admin/activity-log", icon: History },
+      { label: "المستخدمون", href: "/admin/users", icon: Shield },
+      { label: "المظهر", href: "/admin/theme", icon: Palette },
+      { label: "الإعدادات العامة", href: "/admin/settings", icon: Settings },
+      { label: "البريد الإلكتروني", href: "/admin/email", icon: Mail },
       { label: "قوالب البريد", href: "/admin/email/templates", icon: FileText },
       { label: "سجلات الإرسال", href: "/admin/email/logs", icon: History },
+      { label: "نسخ احتياطي واستعادة", href: "/admin/backup", icon: Database },
     ],
   },
 ];
@@ -357,6 +401,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { data: session, status } = useSession();
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
@@ -364,16 +409,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       setAuthChecked(true);
       return;
     }
-    if (!isAdminLoggedIn()) {
+    if (status === "loading") return; // still checking
+    if (status === "unauthenticated" || !session) {
       router.push("/admin/login");
     } else {
       setAuthChecked(true);
     }
-  }, [router, pathname]);
+  }, [router, pathname, status, session]);
 
   const handleLogout = () => {
-    adminLogout();
-    router.push("/admin/login");
+    signOut({ callbackUrl: "/admin/login" });
   };
 
   if (!authChecked) {

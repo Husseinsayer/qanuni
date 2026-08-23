@@ -6,26 +6,32 @@ export default function robots(): MetadataRoute.Robots {
   const base = seo.meta.metadataBase.replace(/\/$/, "");
   const r = seo.robots;
 
-  const allow: string[] = [];
-  const disallow: string[] = [];
-
-  // Parse global directive
   const isNoindex = /noindex/i.test(r.global);
 
   if (isNoindex) {
-    disallow.push("/");
-  } else {
-    allow.push("/");
-    // Common disallows
-    disallow.push("/admin");
-    disallow.push("/api");
+    return {
+      rules: {
+        userAgent: "*",
+        disallow: "/",
+      },
+      sitemap: base + "/sitemap.xml",
+      host: base,
+    };
   }
 
   return {
     rules: {
       userAgent: "*",
-      allow,
-      disallow,
+      allow: ["/", "/_next/static/", "/api/upload"],
+      disallow: [
+        "/admin",
+        "/api",
+        "/auth/",
+        "/client/",
+        "/lawyer/",
+        "/chat",
+        "/_next/webpack-hmr",
+      ],
     },
     sitemap: base + "/sitemap.xml",
     host: base,

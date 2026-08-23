@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { motion } from "framer-motion";
+import Link from "next/link";
 import {
   BadgeCheck,
   MapPin,
@@ -15,12 +15,12 @@ import {
   Search,
 } from "lucide-react";
 import { SectionTitle, Card } from "@/components/ui/card";
-import { Reveal } from "@/components/reveal";
 import { lawyerSlug, type Lawyer } from "@/lib/data";
-import { getAllLawyerProfiles } from "@/lib/lawyer-profiles";
+import { useSiteData } from "@/lib/use-site-data";
 import { cn, toArabicDigits } from "@/lib/utils";
+import { AdBanner } from "@/components/ad-banner";
 
-type Sort = "rating" | "experience" | "price";
+type Sort = "rating" | "experience";
 
 const PER_PAGE = 6;
 
@@ -30,14 +30,22 @@ function LawyerGridCard({ lawyer }: { lawyer: Lawyer }) {
     <Card className="card-hover flex h-full flex-col p-5">
       <div className="flex items-start gap-3">
         <div className="relative shrink-0">
-          <span
-            className={cn(
-              "grid size-14 place-items-center rounded-2xl bg-gradient-to-br text-lg font-extrabold text-white",
-              lawyer.hue
-            )}
-          >
-            {lawyer.initials}
-          </span>
+          {lawyer.photoUrl ? (
+            <img
+              src={lawyer.photoUrl}
+              alt={lawyer.name}
+              className="size-14 rounded-2xl object-cover"
+            />
+          ) : (
+            <span
+              className={cn(
+                "grid size-14 place-items-center rounded-2xl bg-gradient-to-br text-lg font-extrabold text-white",
+                lawyer.hue
+              )}
+            >
+              {lawyer.initials}
+            </span>
+          )}
           {lawyer.verified && (
             <span className="absolute -bottom-1 -left-1 grid size-5 place-items-center rounded-full bg-gold text-white">
               <BadgeCheck className="size-3.5" />
@@ -46,9 +54,9 @@ function LawyerGridCard({ lawyer }: { lawyer: Lawyer }) {
         </div>
         <div className="min-w-0 flex-1 text-right">
           <h3 className="truncate font-bold">
-            <a href={`/lawyers/${lawyerSlug(lawyer)}`} className="transition hover:text-accent">
+            <Link href={`/lawyers/${lawyerSlug(lawyer)}`} className="transition hover:text-accent">
               {lawyer.name}
-            </a>
+            </Link>
           </h3>
           <div className="mt-1 flex items-center justify-end gap-1 text-xs text-muted-foreground">
             <MapPin className="size-3" /> {lawyer.city}
@@ -75,18 +83,12 @@ function LawyerGridCard({ lawyer }: { lawyer: Lawyer }) {
       <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{lawyer.bio}</p>
 
       <div className="mt-auto flex gap-2 pt-4">
-        <a
+        <Link
           href={`/lawyers/${lawyerSlug(lawyer)}`}
           className="inline-flex flex-1 items-center justify-center rounded-xl border border-border px-3 py-2 text-sm font-semibold transition hover:border-accent hover:text-accent"
         >
           عرض الملف
-        </a>
-        <a
-          href={`/lawyers/${lawyerSlug(lawyer)}#booking`}
-          className="inline-flex items-center justify-center rounded-xl bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-accent/90"
-        >
-          تواصل
-        </a>
+        </Link>
       </div>
     </Card>
   );
@@ -100,7 +102,7 @@ export function LawyersDirectory() {
   const [sort, setSort] = React.useState<Sort>("rating");
   const [page, setPage] = React.useState(1);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
-  const [allLawyers] = React.useState<Lawyer[]>(getAllLawyerProfiles);
+  const { lawyers: allLawyers, isLoading } = useSiteData();
 
   const filtered = React.useMemo(() => {
     let list = allLawyers.filter((l) => {
@@ -112,11 +114,10 @@ export function LawyersDirectory() {
     });
     list = [...list].sort((a, b) => {
       if (sort === "rating") return b.rating - a.rating;
-      if (sort === "experience") return b.experience - a.experience;
-      return a.price - b.price;
+      return b.experience - a.experience;
     });
     return list;
-  }, [city, spec, verified, online, sort]);
+  }, [allLawyers, city, spec, verified, online, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const current = Math.min(page, totalPages);
@@ -196,7 +197,6 @@ export function LawyersDirectory() {
                   >
                     <option value="rating">الأعلى تقييماً</option>
                     <option value="experience">الأكثر خبرة</option>
-                    <option value="price">الأقل سعراً</option>
                   </select>
                 </FilterGroup>
 
@@ -216,7 +216,11 @@ export function LawyersDirectory() {
               عرض {toArabicDigits(filtered.length)} محامٍ
             </p>
 
-            {pageItems.length === 0 ? (
+            {isLoading ? (
+              <div className="grid place-items-center rounded-2xl border border-border py-20 text-center">
+                <p className="text-sm text-muted-foreground">جاري تحميل البيانات...</p>
+              </div>
+            ) : pageItems.length === 0 ? (
               <div className="grid place-items-center rounded-2xl border border-dashed border-border py-20 text-center">
                 <SearchX className="size-12 text-muted-foreground/50" />
                 <p className="mt-4 font-bold">لا توجد نتائج مطابقة</p>
@@ -229,11 +233,15 @@ export function LawyersDirectory() {
                 </button>
               </div>
             ) : (
+              <>
               <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
                 {pageItems.map((lawyer) => (
                   <LawyerGridCard key={lawyer.id} lawyer={lawyer} />
                 ))}
               </div>
+              {/* Ad: داخل شبكة المحامين */}
+              <AdBanner placementKey="lawyers-inline" />
+              </>
             )}
 
             {/* Pagination */}
@@ -311,7 +319,7 @@ function Toggle({
         <span
           className={cn(
             "absolute top-0.5 size-4 rounded-full bg-white transition-all",
-            checked ? "left-0.5" : "left-[18px]"
+            checked ? "left-[18px]" : "left-0.5"
           )}
         />
       </span>

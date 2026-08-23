@@ -134,7 +134,7 @@ function identifyMissingInfo(
   answers: QuestionAnswer[]
 ): string[] {
   const missing: string[] = [];
-  const answeredIds = new Set(answers.map((a) => a.questionId));
+  // const answeredIds = new Set(answers.map((a) => a.questionId));
 
   // Required info by case type
   const requiredInfo: Record<CaseType, string[]> = {

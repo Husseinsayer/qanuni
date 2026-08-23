@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { Star, ThumbsUp, ThumbsDown, Flag, MessageSquare } from "lucide-react";
+import { Star, ThumbsUp, ThumbsDown, Flag } from "lucide-react";
 
 type RatingProps = {
   messageId: string;
@@ -10,7 +10,7 @@ type RatingProps = {
   initialRating?: number;
 };
 
-export function Rating({ messageId, onRate, initialRating }: RatingProps) {
+export function Rating({ onRate, initialRating }: RatingProps) {
   const [rating, setRating] = useState(initialRating || 0);
   const [hoveredStar, setHoveredStar] = useState(0);
   const [feedback, setFeedback] = useState("");
@@ -118,7 +118,7 @@ type QuickFeedbackProps = {
   onFeedback: (type: "helpful" | "not_helpful" | "report", details?: string) => void;
 };
 
-export function QuickFeedback({ messageId, onFeedback }: QuickFeedbackProps) {
+export function QuickFeedback({ onFeedback }: QuickFeedbackProps) {
   const [reported, setReported] = useState(false);
 
   return (

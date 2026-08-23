@@ -126,7 +126,7 @@ export function ConversationSearch({
 
       {query && results.length === 0 && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-background border border-border rounded-xl shadow-lg z-50 p-4 text-center text-sm text-muted-foreground">
-          لا توجد نتائج لـ "{query}"
+          لا توجد نتائج لـ &quot;{query}&quot;
         </div>
       )}
     </div>

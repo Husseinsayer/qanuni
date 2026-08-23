@@ -10,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   Settings,
-  Phone,
   Bot,
   MapPinned,
   RotateCcw,
@@ -19,29 +18,26 @@ import {
   X,
   AlertTriangle,
   Palette,
-  Type,
-  Image,
   Trash2,
   Lock,
   CheckCircle2,
+  Scale,
+  UserPlus,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useAdminContext } from "../admin-context";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/lib/admin-toast";
 
 type GeneralConfig = {
-  siteName: string;
-  siteDescription: string;
-  tagline: string;
-  phone: string;
-  email: string;
-  address: string;
-  workingHours: string;
+  // AI
   aiEnabled: boolean;
   aiGreeting: string;
   aiExample: string;
   aiPlaceholder: string;
   aiComingSoon: string;
+  // Lists
   cities: string[];
   specializations: string[];
   languages: string[];
@@ -56,14 +52,6 @@ type GeneralConfig = {
 };
 
 const defaults: GeneralConfig = {
-  siteName: "قانوني",
-  siteDescription:
-    "منصة قانونية عراقية شاملة — ابحث في القوانين والمحامين والمقالات",
-  tagline: "دليلك الذكي للقوانين العراقية",
-  phone: "+964 700 000 0000",
-  email: "info@iqlegal.example",
-  address: "بغداد — الكرخ، شارع الرشيد",
-  workingHours: "السبت — الخميس · 9 ص — 5 م",
   aiEnabled: true,
   aiGreeting: "مرحباً! أنا مساعدك القانوني الذكي. كيف يمكنني مساعدتك اليوم؟",
   aiExample: "ما هي شروط الحضانة في القانون العراقي؟",
@@ -294,14 +282,89 @@ function PasswordChangeSection() {
 }
 
 export default function SettingsPage() {
-  const [config, setConfig] = useState<GeneralConfig>(defaults);
+  const { data, update: adminUpdate } = useAdminContext();
   const [showResetModal, setShowResetModal] = useState(false);
+
+  const buildConfig = (): GeneralConfig => ({
+    aiEnabled: data.floatingAI?.enabled ?? defaults.aiEnabled,
+    aiGreeting: data.floatingAI?.greeting || defaults.aiGreeting,
+    aiExample: data.floatingAI?.example || defaults.aiExample,
+    aiPlaceholder: data.floatingAI?.placeholder || defaults.aiPlaceholder,
+    aiComingSoon: data.floatingAI?.soonText || defaults.aiComingSoon,
+    cities: data.cities?.length ? data.cities : defaults.cities,
+    specializations: data.specializations?.length ? data.specializations : defaults.specializations,
+    languages: defaults.languages,
+    primaryColor: data.theme?.accentColor || defaults.primaryColor,
+    secondaryColor: data.theme?.secondaryColor || defaults.secondaryColor,
+    headingFont: defaults.headingFont,
+    bodyFont: defaults.bodyFont,
+    logoUrl: data.seo?.general?.logo || defaults.logoUrl,
+    darkLogoUrl: defaults.darkLogoUrl,
+    faviconUrl: defaults.faviconUrl,
+  });
+
+  const [config, setConfig] = useState<GeneralConfig>(buildConfig);
 
   const update = <K extends keyof GeneralConfig>(
     key: K,
     val: GeneralConfig[K]
   ) => {
     setConfig((prev) => ({ ...prev, [key]: val }));
+  };
+
+  const saveToAdmin = async () => {
+    adminUpdate("floatingAI", {
+      greeting: config.aiGreeting,
+      example: config.aiExample,
+      placeholder: config.aiPlaceholder,
+      soonText: config.aiComingSoon,
+      enabled: config.aiEnabled,
+    });
+    adminUpdate("theme", {
+      ...data.theme,
+      accentColor: config.primaryColor,
+      secondaryColor: config.secondaryColor,
+    });
+    adminUpdate("cities", config.cities);
+    adminUpdate("specializations", config.specializations);
+    // Sync all settings to API so public site picks up changes
+    try {
+      const res = await fetch("/api/site-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          registrationEnabled: data.registrationEnabled !== false,
+          lawTypeVisibility: data.lawTypeVisibility || { all: true, decisions: true, regulations: true, systems: true },
+          lawPageTabs: data.lawPageTabs,
+          categories: data.categories,
+          hero: {
+            badge: data.hero?.badge || "",
+            title: data.hero?.title || "",
+            titleGradient: data.hero?.titleGradient || "",
+            subtitle: data.hero?.subtitle || "",
+            btnPrimary: data.hero?.btnPrimary || "",
+            btnSecondary: data.hero?.btnSecondary || "",
+          },
+          footer: data.footer ? {
+            description: data.footer.description || "",
+            newsletterText: data.footer.newsletterText || "",
+            phone: data.footer.phone || "",
+            email: data.footer.email || "",
+            address: data.footer.address || "",
+            workingHours: data.footer.workingHours || "",
+            socials: data.footer.socials || {},
+            legalLinks: data.footer.legalLinks || [],
+          } : undefined,
+        }),
+      });
+      if (!res.ok) {
+        console.error("Settings sync failed:", res.status);
+      }
+    } catch (e) {
+      console.error("Settings sync error:", e);
+    }
+    toast.success("تم الحفظ بنجاح", "تم حفظ جميع الإعدادات وتطبيقها على الموقع");
   };
 
   const reset = () => {
@@ -318,100 +381,6 @@ export default function SettingsPage() {
         </div>
         <h1 className="text-2xl font-extrabold">الإعدادات العامة</h1>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>معلومات المنصة</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold">
-              اسم الموقع
-            </label>
-            <input
-              value={config.siteName}
-              onChange={(e) => update("siteName", e.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold">
-              وصف الموقع (Footer)
-            </label>
-            <textarea
-              value={config.siteDescription}
-              onChange={(e) => update("siteDescription", e.target.value)}
-              rows={2}
-              className="w-full resize-none rounded-lg border border-border bg-background px-4 py-2.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold">
-              الشعار المختصر
-            </label>
-            <input
-              value={config.tagline}
-              onChange={(e) => update("tagline", e.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Phone className="h-5 w-5 text-accent" />
-            معلومات التواصل
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold">
-                رقم الهاتف
-              </label>
-              <input
-                value={config.phone}
-                onChange={(e) => update("phone", e.target.value)}
-                dir="ltr"
-                className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-left text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold">
-                البريد الإلكتروني
-              </label>
-              <input
-                value={config.email}
-                onChange={(e) => update("email", e.target.value)}
-                dir="ltr"
-                className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-left text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold">
-              العنوان
-            </label>
-            <input
-              value={config.address}
-              onChange={(e) => update("address", e.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold">
-              ساعات العمل
-            </label>
-            <input
-              value={config.workingHours}
-              onChange={(e) => update("workingHours", e.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          </div>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -534,6 +503,126 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Law Page Tabs Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Scale className="h-5 w-5 text-accent" />
+            أزرار تصنيف القوانين
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            الأزرار التي تظهر في أعلى صفحة القوانين لتصفية القوانين حسب النوع. يمكنك إضافة وتعديل وحذف الأزرار.
+          </p>
+
+          <div className="space-y-3">
+            {data.lawPageTabs.map((tab) => (
+              <TabItem
+                key={tab.id}
+                tab={tab}
+                onChange={(updated) => {
+                  adminUpdate(
+                    "lawPageTabs",
+                    data.lawPageTabs.map((t) => (t.id === tab.id ? updated : t))
+                  );
+                }}
+                onDelete={() => {
+                  adminUpdate(
+                    "lawPageTabs",
+                    data.lawPageTabs.filter((t) => t.id !== tab.id)
+                  );
+                  toast.success("تم الحذف", `تم حذف "${tab.name}"`);
+                }}
+              />
+            ))}
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const id = `tab-${Date.now()}`;
+              adminUpdate("lawPageTabs", [
+                ...data.lawPageTabs,
+                { id, name: "تبويب جديد", filterCategory: "" },
+              ]);
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            إضافة تبويب جديد
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Law Type Visibility */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Eye className="h-5 w-5 text-accent" />
+            إظهار/إخفاء أنواع القوانين
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            التحكم في إظهار أو إخفاء كل نوع قوانين في صفحة القوانين.
+          </p>
+          {[
+            { key: "all", label: "القوانين العراقية" },
+            { key: "decisions", label: "قرارات محكمة التمييز" },
+            { key: "regulations", label: "التعليمات" },
+            { key: "systems", label: "الأنظمة" },
+          ].map(({ key, label }) => (
+            <div key={key} className="flex items-center justify-between rounded-xl border border-border p-4">
+              <div className="flex items-center gap-3">
+                {data.lawTypeVisibility?.[key] !== false ? (
+                  <Eye className="h-4 w-4 text-success" />
+                ) : (
+                  <EyeOff className="h-4 w-4 text-muted-foreground" />
+                )}
+                <div>
+                  <p className="text-sm font-semibold">{label}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {data.lawTypeVisibility?.[key] !== false ? "ظاهر في الموقع" : "مخفي من الموقع"}
+                  </p>
+                </div>
+              </div>
+              <Toggle
+                checked={data.lawTypeVisibility?.[key] !== false}
+                onChange={(v) => {
+                  const current = data.lawTypeVisibility || { all: true, decisions: true, regulations: true, systems: true };
+                  adminUpdate("lawTypeVisibility", { ...current, [key]: v });
+                }}
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Registration Toggle */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <UserPlus className="h-5 w-5 text-accent" />
+            التسجيل في الموقع
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between rounded-xl border border-border p-4">
+            <div>
+              <p className="text-sm font-semibold">تفعيل التسجيل</p>
+              <p className="text-xs text-muted-foreground">
+                عند التعطيل، لن يتمكن الزوار من إنشاء حساب جديد
+              </p>
+            </div>
+            <Toggle
+              checked={data.registrationEnabled !== false}
+              onChange={(v) => adminUpdate("registrationEnabled", v)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -601,21 +690,45 @@ export default function SettingsPage() {
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <label className="mb-1.5 block text-sm font-semibold">الشعار (Light)</label>
-              <input value={config.logoUrl} onChange={(e) => update("logoUrl", e.target.value)}
-                placeholder="رابط الصورة..."
-                className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm" dir="ltr" />
+              <div className="space-y-2">
+                {config.logoUrl && (
+                  <div className="relative h-20 w-40 overflow-hidden rounded-lg border border-border bg-muted/30 p-2">
+                    <img src={config.logoUrl} alt="معاينة الشعار" className="h-full w-full object-contain" />
+                    <button onClick={() => update("logoUrl", "")} className="absolute right-1 top-1 grid size-5 place-items-center rounded-full bg-danger text-white hover:bg-danger/80"><X className="h-3 w-3" /></button>
+                  </div>
+                )}
+                <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = (ev) => update("logoUrl", ev.target?.result as string); r.readAsDataURL(f); }}
+                  className="w-full text-xs text-muted-foreground file:mr-2 file:rounded-lg file:border-0 file:bg-accent/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-accent hover:file:bg-accent/20" />
+                <input value={config.logoUrl.startsWith("data:") ? "" : config.logoUrl} onChange={(e) => update("logoUrl", e.target.value)} placeholder="أو أدخل رابط الصورة..." className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm" dir="ltr" />
+              </div>
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-semibold">الشعار (Dark)</label>
-              <input value={config.darkLogoUrl} onChange={(e) => update("darkLogoUrl", e.target.value)}
-                placeholder="رابط الصورة..."
-                className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm" dir="ltr" />
+              <div className="space-y-2">
+                {config.darkLogoUrl && (
+                  <div className="relative h-20 w-40 overflow-hidden rounded-lg border border-border bg-muted/30 p-2">
+                    <img src={config.darkLogoUrl} alt="معاينة الشعار الداكن" className="h-full w-full object-contain" />
+                    <button onClick={() => update("darkLogoUrl", "")} className="absolute right-1 top-1 grid size-5 place-items-center rounded-full bg-danger text-white hover:bg-danger/80"><X className="h-3 w-3" /></button>
+                  </div>
+                )}
+                <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = (ev) => update("darkLogoUrl", ev.target?.result as string); r.readAsDataURL(f); }}
+                  className="w-full text-xs text-muted-foreground file:mr-2 file:rounded-lg file:border-0 file:bg-accent/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-accent hover:file:bg-accent/20" />
+                <input value={config.darkLogoUrl.startsWith("data:") ? "" : config.darkLogoUrl} onChange={(e) => update("darkLogoUrl", e.target.value)} placeholder="أو أدخل رابط الصورة..." className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm" dir="ltr" />
+              </div>
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-semibold">الأيقونة المفضلة (Favicon)</label>
-              <input value={config.faviconUrl} onChange={(e) => update("faviconUrl", e.target.value)}
-                placeholder="رابط الصورة..."
-                className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm" dir="ltr" />
+              <div className="space-y-2">
+                {config.faviconUrl && (
+                  <div className="relative h-12 w-12 overflow-hidden rounded-lg border border-border bg-muted/30 p-1">
+                    <img src={config.faviconUrl} alt="معاينة الأيقونة" className="h-full w-full object-contain" />
+                    <button onClick={() => update("faviconUrl", "")} className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-danger text-white hover:bg-danger/80"><X className="h-2.5 w-2.5" /></button>
+                  </div>
+                )}
+                <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = (ev) => update("faviconUrl", ev.target?.result as string); r.readAsDataURL(f); }}
+                  className="w-full text-xs text-muted-foreground file:mr-2 file:rounded-lg file:border-0 file:bg-accent/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-accent hover:file:bg-accent/20" />
+                <input value={config.faviconUrl.startsWith("data:") ? "" : config.faviconUrl} onChange={(e) => update("faviconUrl", e.target.value)} placeholder="أو أدخل رابط الصورة..." className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm" dir="ltr" />
+              </div>
             </div>
           </div>
           <div className="rounded-xl border border-border bg-muted/30 p-4">
@@ -649,7 +762,7 @@ export default function SettingsPage() {
       </Card>
 
       <div className="flex gap-3">
-        <Button variant="accent" onClick={() => toast.success("تم الحفظ بنجاح", "تم حفظ الإعدادات العامة")}>
+        <Button variant="accent" onClick={saveToAdmin}>
           <Save className="h-4 w-4" />
           حفظ الإعدادات
         </Button>
@@ -668,6 +781,61 @@ export default function SettingsPage() {
         onConfirm={reset}
         onCancel={() => setShowResetModal(false)}
       />
+    </div>
+  );
+}
+
+interface TabItemProps {
+  tab: { id: string; name: string; filterCategory?: string };
+  onChange: (tab: { id: string; name: string; filterCategory?: string }) => void;
+  onDelete: () => void;
+}
+
+function TabItem({ tab, onChange, onDelete }: TabItemProps) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-background p-3">
+      <div className="flex-1 space-y-2">
+        <input
+          value={tab.name}
+          onChange={(e) => onChange({ ...tab, name: e.target.value })}
+          className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-accent"
+          placeholder="اسم التبويب"
+        />
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">تصفية حسب التصنيف:</span>
+          <select
+            value={tab.filterCategory || ""}
+            onChange={(e) =>
+              onChange({ ...tab, filterCategory: e.target.value || undefined })
+            }
+            className="flex-1 rounded-lg border border-border bg-background px-2 py-1 text-xs outline-none focus:border-accent"
+          >
+            <option value="">الكل (بدون تصفية)</option>
+            {["civil", "penal", "personal", "labor", "traffic", "companies", "investment", "commercial", "cassation", "regulation", "system"].map((cat) => (
+              <option key={cat} value={cat}>
+                {cat === "civil" ? "القانون المدني" :
+                 cat === "penal" ? "قانون العقوبات" :
+                 cat === "personal" ? "الأحوال الشخصية" :
+                 cat === "labor" ? "قانون العمل" :
+                 cat === "traffic" ? "قانون المرور" :
+                 cat === "companies" ? "قانون الشركات" :
+                 cat === "investment" ? "قانون الاستثمار" :
+                 cat === "commercial" ? "القانون التجاري" :
+                 cat === "cassation" ? "قرارات محكمة التمييز" :
+                 cat === "regulation" ? "التعليمات" :
+                 cat === "system" ? "الأنظمة" : cat}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <button
+        onClick={onDelete}
+        className="rounded-lg p-2 text-muted-foreground hover:bg-danger/10 hover:text-danger transition-colors"
+        title="حذف"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
     </div>
   );
 }

@@ -1,5 +1,3 @@
-import { PageHeader } from "@/components/page-header";
-
 export const metadata = {
   title: "الشروط والأحكام | منصة قانوني",
   description: "الشروط والأحكام لاستخدام منصة قانوني.",
@@ -8,11 +6,6 @@ export const metadata = {
 export default function TermsPage() {
   return (
     <>
-      <PageHeader
-        eyebrow="قانوني"
-        title="الشروط والأحكام"
-        crumbs={[{ label: "الرئيسية", href: "/" }, { label: "الشروط والأحكام" }]}
-      />
       <section className="container max-w-3xl pb-20">
         <div className="prose prose-lg rtl:prose-right max-w-none text-foreground/90 leading-relaxed">
           <p className="text-lg text-muted-foreground">

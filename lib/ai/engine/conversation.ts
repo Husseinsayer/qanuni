@@ -7,7 +7,6 @@ import type {
 } from "../types";
 import {
   getConversations,
-  setConversations,
   addConversation,
   updateConversation,
   deleteConversation,

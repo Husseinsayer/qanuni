@@ -7,15 +7,19 @@ interface RateLimitEntry {
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
-// Clean up old entries periodically
-setInterval(() => {
+// Clean up old entries lazily (only when checking, not with setInterval)
+let lastCleanup = Date.now();
+function cleanupIfNeeded() {
   const now = Date.now();
+  // Clean every 60 seconds
+  if (now - lastCleanup < 60000) return;
+  lastCleanup = now;
   for (const [key, entry] of rateLimitStore.entries()) {
     if (now > entry.resetTime) {
       rateLimitStore.delete(key);
     }
   }
-}, 60000); // Clean every minute
+}
 
 export interface RateLimitConfig {
   windowMs: number; // Time window in milliseconds
@@ -34,7 +38,8 @@ export const RATE_LIMITS = {
 export function checkRateLimit(
   identifier: string,
   config: RateLimitConfig
-): { allowed: boolean; remaining: number; resetTime: number } {
+): { allowed: boolean; remaining: number; resetTime: number; maxRequests: number } {
+  cleanupIfNeeded();
   const now = Date.now();
   const key = identifier;
   const entry = rateLimitStore.get(key);
@@ -49,32 +54,35 @@ export function checkRateLimit(
       allowed: true,
       remaining: config.maxRequests - 1,
       resetTime: now + config.windowMs,
+      maxRequests: config.maxRequests,
     };
   }
 
   if (entry.count >= config.maxRequests) {
     // Rate limited
-    return {
-      allowed: false,
-      remaining: 0,
-      resetTime: entry.resetTime,
-    };
+      return {
+        allowed: false,
+        remaining: 0,
+        resetTime: entry.resetTime,
+        maxRequests: config.maxRequests,
+      };
   }
 
   // Increment count
-  entry.count++;
-  return {
-    allowed: true,
-    remaining: config.maxRequests - entry.count,
-    resetTime: entry.resetTime,
-  };
+    entry.count++;
+    return {
+      allowed: true,
+      remaining: config.maxRequests - entry.count,
+      resetTime: entry.resetTime,
+      maxRequests: config.maxRequests,
+    };
 }
 
 export function getRateLimitHeaders(
   result: ReturnType<typeof checkRateLimit>
 ): Record<string, string> {
   return {
-    "X-RateLimit-Limit": String(result.resetTime),
+    "X-RateLimit-Limit": String(result.maxRequests ?? 0),
     "X-RateLimit-Remaining": String(result.remaining),
     "X-RateLimit-Reset": String(Math.ceil(result.resetTime / 1000)),
   };

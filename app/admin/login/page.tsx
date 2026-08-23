@@ -2,10 +2,10 @@
 
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { Scale, Eye, EyeOff, Loader2, User } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { adminLogin } from "@/lib/admin-data";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -21,13 +21,19 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     try {
-      const success = await adminLogin(username, password);
+      const result = await signIn("credentials", {
+        email: username,
+        password,
+        redirect: false,
+      });
+
       setLoading(false);
 
-      if (success) {
+      if (result?.ok) {
         router.push("/admin");
+        router.refresh();
       } else {
-        setError("اسم المستخدم أو كلمة المرور غير صحيحة");
+        setError(result?.error || "البريد الإلكتروني أو كلمة المرور غير صحيحة");
       }
     } catch {
       setLoading(false);
@@ -60,18 +66,19 @@ export default function AdminLoginPage() {
             {/* Username field */}
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-foreground">
-                اسم المستخدم
+                البريد الإلكتروني
               </label>
               <div className="relative">
                 <User className="pointer-events-none absolute inset-y-0 right-3 my-auto size-4 text-muted-foreground" />
                 <input
-                  type="text"
+                  type="email"
                   value={username}
                   onChange={(e) => {
                     setUsername(e.target.value);
                     setError("");
                   }}
-                  placeholder="أدخل اسم المستخدم"
+                  placeholder="admin@qanuni.iq"
+                  dir="ltr"
                   className="w-full rounded-xl border border-border bg-background px-4 py-3 pr-10 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   autoFocus
                 />
@@ -84,21 +91,21 @@ export default function AdminLoginPage() {
                 كلمة المرور
               </label>
               <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setError("");
-                  }}
-                  placeholder="أدخل كلمة المرور"
-                  className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
-                >
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError("");
+                    }}
+                    placeholder="أدخل كلمة المرور"
+                    className="w-full rounded-xl border border-border bg-background px-4 py-3 pl-10 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+                  >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
                   ) : (

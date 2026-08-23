@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAdminTable } from "@/lib/use-admin-table";
 import { addItem, updateItem, softDeleteItem, restoreItem, getItems } from "@/lib/knowledge-center/store";
-import { type GovernmentBody, GOVERNMENT_CATEGORIES, GOVERNORATES } from "@/lib/knowledge-center/types";
+import { type GovernmentBody, GOVERNORATES } from "@/lib/knowledge-center/types";
 import { Plus, Pencil, Trash2, X, Search, ChevronRight, ChevronLeft, RotateCcw, Archive, Download, Upload } from "lucide-react";
 import { toast } from "@/lib/admin-toast";
 import { exportSectionToJSON, importFromJSON, readFileAsText } from "@/lib/knowledge-center/import-export";

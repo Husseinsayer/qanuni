@@ -1,14 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { notFound } from "next/navigation";
 import {
   BadgeCheck,
   MapPin,
   Briefcase,
   Star,
-  CalendarCheck,
-  MessageSquare,
   Globe,
   Clock,
   ArrowLeft,
@@ -24,13 +21,16 @@ import {
   Trophy,
   BookOpen,
   ScrollText,
+  User,
+  Eye,
 } from "lucide-react";
-import { Card, Badge } from "@/components/ui/card";
-import { lawyers, articles, type Lawyer } from "@/lib/data";
+import { Card } from "@/components/ui/card";
+import { articles, type Lawyer } from "@/lib/data";
 import { resolveLawyer, getExtByLawyerId, type LawyerService, type WorkingHours, type Review as ExtReview, type Education, type Certification, type PortfolioItem } from "@/lib/lawyer-profiles";
-import { getMyPlanFeatures, hasFeature } from "@/lib/lawyer-plans";
+import { useSiteData } from "@/lib/use-site-data";
 import { cn, toArabicDigits } from "@/lib/utils";
 import { AdBanner } from "@/components/ad-banner";
+import { useSession } from "next-auth/react";
 
 // LocalStorage-based reviews
 type LocalReview = { name: string; text: string; rating: number; date?: string };
@@ -76,31 +76,6 @@ function toggleFavorite(lawyerId: string) {
   } catch { return false; }
 }
 
-// LocalStorage-based saved articles
-function isArticleSaved(articleId: string) {
-  if (typeof window === "undefined") return false;
-  try {
-    const raw = localStorage.getItem("saved_articles");
-    const saved: string[] = raw ? JSON.parse(raw) : [];
-    return saved.includes(articleId);
-  } catch { return false; }
-}
-function toggleSaveArticle(articleId: string) {
-  if (typeof window === "undefined") return false;
-  try {
-    const raw = localStorage.getItem("saved_articles");
-    const saved: string[] = raw ? JSON.parse(raw) : [];
-    if (saved.includes(articleId)) {
-      localStorage.setItem("saved_articles", JSON.stringify(saved.filter((id) => id !== articleId)));
-      return false;
-    } else {
-      saved.push(articleId);
-      localStorage.setItem("saved_articles", JSON.stringify(saved));
-      return true;
-    }
-  } catch { return false; }
-}
-
 const socialIcons = [
   { key: "whatsapp", label: "واتساب", color: "bg-green-500 hover:bg-green-600", href: (v: string) => `https://wa.me/${v.replace(/[^0-9]/g, "")}`, icon: "💬" },
   { key: "telegram", label: "تلغرام", color: "bg-sky-500 hover:bg-sky-600", href: (v: string) => `https://t.me/${v.replace("@", "")}`, icon: "✈️" },
@@ -109,10 +84,11 @@ const socialIcons = [
 ];
 
 export function LawyerProfile({ id }: { id: string }) {
+  const { data: session } = useSession();
   const [lawyer, setLawyer] = React.useState<Lawyer | null>(null);
   const [services, setServices] = React.useState<LawyerService[]>([]);
   const [workingHours, setWorkingHours] = React.useState<WorkingHours | null>(null);
-  const [extReviews, setExtReviews] = React.useState<ExtReview[]>([]);
+  const [, setExtReviews] = React.useState<ExtReview[]>([]);
   const [education, setEducation] = React.useState<Education[]>([]);
   const [certifications, setCertifications] = React.useState<Certification[]>([]);
   const [memberships, setMemberships] = React.useState<string[]>([]);
@@ -124,13 +100,23 @@ export function LawyerProfile({ id }: { id: string }) {
   const [reviewRating, setReviewRating] = React.useState(5);
   const [showReviewForm, setShowReviewForm] = React.useState(false);
 
+  // Auto-fill name from session
+  React.useEffect(() => {
+    if (session?.user?.name && !reviewName) {
+      setReviewName(session.user.name);
+    }
+  }, [session?.user?.name]);
+
   const [loadError, setLoadError] = React.useState(false);
+
+  const { lawyers: apiLawyers, isLoading: siteLoading } = useSiteData();
 
   React.useEffect(() => {
     const found = resolveLawyer(id);
+    let matched: Lawyer | null = null;
+
     if (found) {
-      setLawyer(found);
-      setSaved(isFavorited(found.id));
+      matched = found;
     } else {
       // Fallback: check localStorage profiles directly by ID
       try {
@@ -138,31 +124,79 @@ export function LawyerProfile({ id }: { id: string }) {
         if (raw) {
           const profiles = JSON.parse(raw) as Lawyer[];
           const match = profiles.find((l) => l.id === id);
-          if (match) {
-            setLawyer(match);
-            setSaved(isFavorited(match.id));
+          if (match) matched = match;
+        }
+      } catch { /* silent */ }
+
+      // Fallback: check API-fetched lawyers from useSiteData by slug
+      if (!matched) {
+        const apiMatch = apiLawyers.find((l) => l.slug === id);
+        if (apiMatch) matched = apiMatch;
+      }
+    }
+
+    // Fallback: fetch from database API
+    if (!matched && !siteLoading) {
+      fetch(`/api/lawyer/${id}`)
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => {
+          if (data && data.id) {
+            const dbMapped: Lawyer = {
+              id: data.id,
+              name: data.name || "",
+              slug: data.slug || "",
+              city: data.city || "",
+              specialization: data.specialization || "",
+              experience: data.experience || 0,
+              rating: data.rating || 0,
+              reviews: data.reviewCount || 0,
+              verified: data.verified || false,
+              price: data.price || 0,
+              online: data.online || false,
+              gender: (data.gender as "male" | "female") || "male",
+              languages: (() => { try { return JSON.parse(data.languages || "[]"); } catch { return ["العربية"]; } })(),
+              bio: data.bio || "",
+              initials: data.initials || "",
+              hue: data.hue || "from-blue-600 to-indigo-700",
+              whatsapp: data.whatsapp || "",
+              telegram: data.telegram || "",
+              facebook: data.facebook || "",
+              instagram: data.instagram || "",
+              photoUrl: data.photoUrl || "",
+              points: data.points || 0,
+              email: data.user?.email || "",
+              userId: data.userId || data.user?.id || "",
+            };
+            setLawyer(dbMapped);
+            setSaved(isFavorited(dbMapped.id));
           } else {
             setLoadError(true);
           }
-        } else {
-          setLoadError(true);
-        }
-      } catch {
-        setLoadError(true);
+        })
+        .catch(() => setLoadError(true));
+      return;
+    }
+
+    if (matched) {
+      setLawyer(matched);
+      setSaved(isFavorited(matched.id));
+
+      // Load extension data (services, education, etc.)
+      const ext = getExtByLawyerId(matched.id);
+      if (ext) {
+        setServices(ext.services);
+        setWorkingHours(ext.workingHours);
+        setExtReviews(ext.reviews);
+        setEducation(ext.education);
+        setCertifications(ext.certifications);
+        setMemberships(ext.memberships);
+        setAwards(ext.awards);
+        setPortfolio(ext.portfolio);
       }
+    } else if (!siteLoading && apiLawyers.length >= 0) {
+      setLoadError(true);
     }
-    const ext = getExtByLawyerId(id);
-    if (ext) {
-      setServices(ext.services);
-      setWorkingHours(ext.workingHours);
-      setExtReviews(ext.reviews);
-      setEducation(ext.education);
-      setCertifications(ext.certifications);
-      setMemberships(ext.memberships);
-      setAwards(ext.awards);
-      setPortfolio(ext.portfolio);
-    }
-  }, [id]);
+  }, [id, apiLawyers, siteLoading]);
 
   if (loadError) {
     return (
@@ -196,6 +230,15 @@ export function LawyerProfile({ id }: { id: string }) {
   const articleCount = lawyerArticles.length;
   const hasBadge = articleCount >= 3;
 
+  // Reward tier based on points
+  const points = (lawyer as any).points || 0;
+  const rewardTier = points >= 200 ? { nameAr: "خبير قانوني", color: "#10B981" }
+    : points >= 100 ? { nameAr: "ناشر متميز", color: "#EF4444" }
+    : points >= 60 ? { nameAr: "ناشر محترف", color: "#F59E0B" }
+    : points >= 30 ? { nameAr: "ناشر نشط", color: "#8B5CF6" }
+    : points >= 10 ? { nameAr: "ناشر", color: "#3B82F6" }
+    : null;
+
   const storedReviews = getStoredReviews(id);
   const defaultReviews = [
     "تجربة تعامل احترافية ومريحة مع هذا المحامي، أنصح به.",
@@ -216,18 +259,26 @@ export function LawyerProfile({ id }: { id: string }) {
     <div className="container pb-20">
       <Card className="overflow-hidden">
         <div className="flex flex-col items-center gap-6 bg-gradient-to-l from-secondary to-accent p-8 text-white md:flex-row md:items-center">
-          <span
-            className={cn(
-              "grid size-24 place-items-center rounded-3xl bg-gradient-to-br text-3xl font-extrabold text-white shadow-premium",
-              lawyer.hue
-            )}
-          >
-            {lawyer.initials}
-          </span>
+          {lawyer.photoUrl ? (
+            <img
+              src={lawyer.photoUrl}
+              alt={lawyer.name}
+              className="size-24 rounded-3xl object-cover shadow-premium"
+            />
+          ) : (
+            <span
+              className={cn(
+                "grid size-24 place-items-center rounded-3xl bg-gradient-to-br text-3xl font-extrabold text-white shadow-premium",
+                lawyer.hue
+              )}
+            >
+              {lawyer.initials}
+            </span>
+          )}
           <div className="text-center md:text-right">
             <div className="flex items-center justify-center gap-2 md:justify-start">
               <h2 className="text-2xl font-extrabold md:text-3xl">{lawyer.name}</h2>
-              {lawyer.verified && planHas("verification") && (
+              {lawyer.verified && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-gold px-2.5 py-0.5 text-xs font-bold text-[#1F2937]">
                   <BadgeCheck className="size-3.5" /> موثّق
                 </span>
@@ -235,6 +286,14 @@ export function LawyerProfile({ id }: { id: string }) {
               {hasBadge && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-0.5 text-xs font-bold text-white">
                   <Award className="size-3.5" /> كاتب مميز
+                </span>
+              )}
+              {rewardTier && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold text-white"
+                  style={{ backgroundColor: rewardTier.color }}
+                >
+                  <Award className="size-3.5" /> {rewardTier.nameAr}
                 </span>
               )}
             </div>
@@ -265,12 +324,16 @@ export function LawyerProfile({ id }: { id: string }) {
             </div>
           </div>
           <div className="ml-0 flex gap-2 md:mr-auto">
-            <a
-              href="#booking"
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-secondary transition hover:bg-gold"
+            <button
+              onClick={() => setSaved(toggleFavorite(lawyer.id))}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition",
+                saved ? "bg-gold/15 text-gold" : "border border-white/30 text-white hover:bg-white/10"
+              )}
             >
-              <CalendarCheck className="size-4" /> احجز استشارة
-            </a>
+              <Heart className={cn("size-4", saved && "fill-gold")} />
+              {saved ? "مُضاف" : "أضف للمفضلة"}
+            </button>
           </div>
         </div>
       </Card>
@@ -286,17 +349,23 @@ export function LawyerProfile({ id }: { id: string }) {
           {/* Education */}
           {education.length > 0 && (
             <Card className="p-6">
-              <h3 className="mb-4 text-lg font-bold flex items-center gap-2"><GraduationCap className="size-5 text-accent" /> المؤهلات العلمية</h3>
-              <div className="space-y-3">
+              <h3 className="mb-5 text-lg font-bold flex items-center gap-2"><GraduationCap className="size-5 text-accent" /> المؤهلات العلمية</h3>
+              <div className="relative space-y-0">
+                <div className="absolute right-4 top-2 bottom-2 w-0.5 bg-gradient-to-b from-accent to-accent/20" />
                 {education.map((e) => (
-                  <div key={e.id} className="rounded-xl border border-border p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-semibold">{e.degree}</p>
-                        <p className="mt-0.5 text-sm text-muted-foreground">{e.institution}</p>
-                        {e.description && <p className="mt-1 text-xs text-muted-foreground">{e.description}</p>}
+                  <div key={e.id} className="relative flex gap-4 pb-5 pl-4 last:pb-0">
+                    <div className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-sm">
+                      <GraduationCap className="size-3.5" />
+                    </div>
+                    <div className="flex-1 rounded-xl border border-border bg-muted/20 p-4 transition hover:bg-muted/40">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-bold text-foreground">{e.degree}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">{e.institution}</p>
+                          {e.description && <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground/80">{e.description}</p>}
+                        </div>
+                        <span className="shrink-0 rounded-lg bg-accent/10 px-2.5 py-1 text-xs font-bold text-accent">{toArabicDigits(e.year)}</span>
                       </div>
-                      <span className="shrink-0 rounded-lg bg-accent/10 px-2.5 py-1 text-xs font-bold text-accent">{toArabicDigits(e.year)}</span>
                     </div>
                   </div>
                 ))}
@@ -307,20 +376,25 @@ export function LawyerProfile({ id }: { id: string }) {
           {/* Certifications */}
           {certifications.length > 0 && (
             <Card className="p-6">
-              <h3 className="mb-4 text-lg font-bold flex items-center gap-2"><ScrollText className="size-5 text-accent" /> الشهادات المهنية</h3>
-              <div className="space-y-3">
+              <h3 className="mb-5 text-lg font-bold flex items-center gap-2"><ScrollText className="size-5 text-accent" /> الشهادات المهنية</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
                 {certifications.map((c) => (
-                  <div key={c.id} className="rounded-xl border border-border p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-semibold">{c.title}</p>
-                        <p className="mt-0.5 text-sm text-muted-foreground">{c.issuer}</p>
+                  <div key={c.id} className="group relative overflow-hidden rounded-xl border border-border bg-muted/20 p-4 transition hover:border-accent/30 hover:bg-muted/40">
+                    <div className="absolute -left-2 -top-2 size-16 rounded-full bg-accent/5" />
+                    <div className="relative">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-bold text-foreground">{c.title}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">{c.issuer}</p>
+                        </div>
+                        <span className="shrink-0 rounded-lg bg-accent/10 px-2.5 py-1 text-xs font-bold text-accent">{toArabicDigits(c.year)}</span>
                       </div>
-                      <span className="shrink-0 rounded-lg bg-accent/10 px-2.5 py-1 text-xs font-bold text-accent">{toArabicDigits(c.year)}</span>
+                      {c.expiryYear && (
+                        <p className="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                          ينتهي: {toArabicDigits(c.expiryYear)}
+                        </p>
+                      )}
                     </div>
-                    {c.expiryYear && (
-                      <p className="mt-1 text-xs text-muted-foreground">ينتهي في: {toArabicDigits(c.expiryYear)}</p>
-                    )}
                   </div>
                 ))}
               </div>
@@ -500,33 +574,45 @@ export function LawyerProfile({ id }: { id: string }) {
 
             {showReviewForm && (
               <form onSubmit={handleReviewSubmit} className="mb-4 rounded-xl border border-border p-4">
-                <input
-                  value={reviewName}
-                  onChange={(e) => setReviewName(e.target.value)}
-                  placeholder="اسمك"
-                  className="mb-3 h-10 w-full rounded-xl border border-border bg-muted/40 px-4 text-sm outline-none focus:border-accent"
-                  required
-                />
-                <textarea
-                  value={reviewText}
-                  onChange={(e) => setReviewText(e.target.value)}
-                  placeholder="تقييمك وتجربتك مع هذا المحامي..."
-                  rows={3}
-                  className="mb-3 w-full rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm outline-none focus:border-accent"
-                  required
-                />
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">التقييم:</span>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setReviewRating(n)}
-                      className={cn("transition", n <= reviewRating ? "text-gold" : "text-muted-foreground/30")}
-                    >
-                      <Star className={cn("size-5", n <= reviewRating && "fill-gold")} />
-                    </button>
-                  ))}
+                <div className="mb-3">
+                  <label className="mb-1 block text-sm font-medium text-muted-foreground">اسمك</label>
+                  <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-4 h-10">
+                    <User className="size-4 text-muted-foreground" />
+                    <input
+                      value={reviewName}
+                      onChange={(e) => setReviewName(e.target.value)}
+                      placeholder="اسمك"
+                      className="flex-1 bg-transparent text-sm outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <label className="mb-1 block text-sm font-medium text-muted-foreground">تقييمك</label>
+                  <textarea
+                    value={reviewText}
+                    onChange={(e) => setReviewText(e.target.value)}
+                    placeholder="اكتب تجربتك مع هذا المحامي..."
+                    rows={3}
+                    className="w-full rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm outline-none focus:border-accent"
+                    required
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="mb-1 block text-sm font-medium text-muted-foreground">عدد النجوم</label>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setReviewRating(n)}
+                        className={cn("transition", n <= reviewRating ? "text-gold" : "text-muted-foreground/30")}
+                      >
+                        <Star className={cn("size-6", n <= reviewRating && "fill-gold")} />
+                      </button>
+                    ))}
+                    <span className="mr-2 text-sm text-muted-foreground">({reviewRating} من 5)</span>
+                  </div>
                 </div>
                 <button
                   type="submit"
@@ -556,77 +642,67 @@ export function LawyerProfile({ id }: { id: string }) {
         </div>
 
         {/* Sidebar */}
-        <div id="booking" className="lg:sticky lg:top-24 lg:self-start space-y-6">
-          <Card className="p-6">
-            <h3 className="mb-4 text-lg font-bold">حجز استشارة</h3>
-            <div className="mb-4 flex items-center justify-between rounded-xl bg-muted/50 px-4 py-3">
-              <span className="text-sm text-muted-foreground">سعر الاستشارة</span>
-              <span className="font-bold text-accent">{toArabicDigits(lawyer.price)} ألف د.ع</span>
+        <div className="lg:sticky lg:top-24 lg:self-start space-y-6">
+          {/* Points & Plan Card */}
+          <Card className="overflow-hidden">
+            <div className="bg-gradient-to-l from-primary to-accent p-5 text-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Trophy className="size-5" />
+                  <span className="text-sm font-bold">النقاط والخطة</span>
+                </div>
+                {rewardTier && (
+                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold">{rewardTier.nameAr}</span>
+                )}
+              </div>
+              <div className="mt-3 flex items-end gap-2">
+                <span className="text-3xl font-extrabold">{points}</span>
+                <span className="mb-1 text-sm text-white/80">نقطة</span>
+              </div>
+              {/* Progress to next tier */}
+              {(() => {
+                const tiers = [0, 10, 30, 60, 100, 200];
+                const tierNames = ["مبتدئ", "ناشر", "ناشر نشط", "ناشر محترف", "ناشر متميز", "خبير قانوني"];
+                const currentIdx = tiers.findLastIndex((t) => points >= t);
+                const nextIdx = Math.min(currentIdx + 1, tiers.length - 1);
+                if (currentIdx >= tiers.length - 1) return null;
+                const progress = ((points - tiers[currentIdx]) / (tiers[nextIdx] - tiers[currentIdx])) * 100;
+                return (
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-xs text-white/70">
+                      <span>التالي: {tierNames[nextIdx]}</span>
+                      <span>{tiers[nextIdx] - points} نقطة متبقية</span>
+                    </div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/20">
+                      <div className="h-full rounded-full bg-gold transition-all" style={{ width: `${Math.min(progress, 100)}%` }} />
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
-            <a
-              href="/booking"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-white transition hover:bg-accent/90"
-            >
-              <CalendarCheck className="size-4" /> احجز موعداً
-            </a>
-            <a
-              href={lawyer.whatsapp ? `https://wa.me/${lawyer.whatsapp.replace(/[^0-9]/g, '')}` : '/contact'}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn(
-                "mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border px-5 py-3 text-sm font-semibold transition hover:border-accent hover:text-accent",
-                !planHas("messages") && "pointer-events-none opacity-40"
-              )}
-            >
-              <MessageSquare className="size-4" /> {planHas("messages") ? "مراسلة مباشرة" : "مراسلة (خطة مطلوبة)"}
-            </a>
-            <button
-              onClick={() => setSaved(toggleFavorite(lawyer.id))}
-              className={cn(
-                "mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-semibold transition",
-                saved ? "border-gold text-gold" : "border-border hover:border-gold hover:text-gold"
-              )}
-            >
-              <Heart className={cn("size-4", saved && "fill-gold")} />
-              {saved ? "مضاف إلى المفضلة" : "أضف إلى المفضلة"}
-            </button>
+            <div className="p-4">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg bg-muted/50 p-2">
+                  <p className="text-lg font-bold">{points}</p>
+                  <p className="text-[10px] text-muted-foreground">النقاط</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-2">
+                  <p className="text-lg font-bold">{articleCount}</p>
+                  <p className="text-[10px] text-muted-foreground">المقالات</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-2">
+                  <p className="text-lg font-bold">{lawyer.reviews}</p>
+                  <p className="text-[10px] text-muted-foreground">التقييمات</p>
+                </div>
+              </div>
+            </div>
           </Card>
 
-          {/* Ad: Skyscraper في Sidebar */}
-          <AdBanner size="skyscraper" placementKey="sidebar-top" />
+          {/* Ad: الشريط الجانبي للمحامي */}
+          <AdBanner placementKey="lawyer-sidebar" />
         </div>
       </div>
-    </div>
-  );
-}
 
-function Info({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-border p-3">
-      <span className="grid size-9 place-items-center rounded-lg bg-accent/10 text-accent">
-        <Icon className="size-4" />
-      </span>
-      <div className="text-right">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-sm font-semibold">{value}</p>
-      </div>
     </div>
-  );
-}
-
-function Eye({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
   );
 }

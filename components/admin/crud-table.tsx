@@ -52,7 +52,7 @@ export function CrudTable<T extends { id: string; deletedAt: string | null; isAc
     [items, showArchived]
   );
 
-  const { search, setSearch, page, setPage, pageSize, setPageSize, paged, totalPages, total } =
+  const { search, setSearch, page, setPage, paged, totalPages, total } =
     useAdminTable(activeItems, config.searchFields as (keyof T)[]);
 
   const openAdd = () => {

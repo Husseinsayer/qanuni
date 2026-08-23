@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Search, ArrowLeft } from "lucide-react";
-import { PageHeader } from "@/components/page-header";
+import Link from "next/link";
+import { Search } from "lucide-react";
+import { AdBanner } from "@/components/ad-banner";
 import { Card } from "@/components/ui/card";
-import { lawyers, laws, articles, lawyerSlug } from "@/lib/data";
+import { lawyers as staticLawyers, laws as staticLaws, articles as staticArticles, lawyerSlug, type Law, type Article, type Lawyer } from "@/lib/data";
+import { useSiteData } from "@/lib/use-site-data";
 import { toArabicDigits } from "@/lib/utils";
 
 type Tab = "all" | "lawyers" | "laws" | "articles";
@@ -12,6 +14,29 @@ type Tab = "all" | "lawyers" | "laws" | "articles";
 export default function SearchPage() {
   const [query, setQuery] = React.useState("");
   const [tab, setTab] = React.useState<Tab>("all");
+  const { lawyers: apiLawyers, laws: apiLaws, articles: apiArticles } = useSiteData();
+
+  // Merge live DB data with static fallback (dedupe by id), cast API rows to static shapes
+  const lawyers = React.useMemo<Lawyer[]>(() => {
+    const map = new Map<string, Lawyer>();
+    staticLawyers.forEach((l) => map.set(l.id, l));
+    apiLawyers.forEach((l) => map.set(l.id, l as Lawyer));
+    return Array.from(map.values());
+  }, [apiLawyers]);
+
+  const laws = React.useMemo<Law[]>(() => {
+    const map = new Map<string, Law>();
+    staticLaws.forEach((l) => map.set(l.id, l));
+    apiLaws.forEach((l) => map.set(l.id, l as unknown as Law));
+    return Array.from(map.values());
+  }, [apiLaws]);
+
+  const articles = React.useMemo<Article[]>(() => {
+    const map = new Map<string, Article>();
+    staticArticles.forEach((a) => map.set(a.id, a));
+    apiArticles.forEach((a) => map.set(a.id, a as unknown as Article));
+    return Array.from(map.values());
+  }, [apiArticles]);
 
   const q = query.trim().toLowerCase();
 
@@ -20,22 +45,22 @@ export default function SearchPage() {
       q
         ? lawyers.filter(
             (l) =>
-              l.name.includes(q) ||
-              l.city.includes(q) ||
-              l.specialization.includes(q)
+              l.name.toLowerCase().includes(q) ||
+              l.city.toLowerCase().includes(q) ||
+              l.specialization.toLowerCase().includes(q)
           )
         : [],
-    [q]
+    [q, lawyers]
   );
 
   const lawResults = React.useMemo(
     () =>
       q
         ? laws.filter(
-            (l) => l.name.includes(q) || l.id.includes(q)
+            (l) => l.name.toLowerCase().includes(q) || l.id.toLowerCase().includes(q)
           )
         : [],
-    [q]
+    [q, laws]
   );
 
   const articleResults = React.useMemo(
@@ -43,38 +68,30 @@ export default function SearchPage() {
       q
         ? articles.filter(
             (a) =>
-              a.title.includes(q) ||
-              a.excerpt.includes(q) ||
-              a.author.includes(q)
+              a.title.toLowerCase().includes(q) ||
+              a.excerpt.toLowerCase().includes(q) ||
+              a.author.toLowerCase().includes(q)
           )
         : [],
-    [q]
+    [q, articles]
   );
 
   const allResults = tab === "lawyers" ? lawyerResults : tab === "laws" ? lawResults : tab === "articles" ? articleResults : [...lawyerResults, ...lawResults, ...articleResults];
 
   return (
     <>
-      <PageHeader
-        eyebrow="بحث"
-        title="ابحث في المنصة"
-        subtitle="ابحث عن محامين وقوانين ومقالات قانونية."
-        crumbs={[{ label: "الرئيسية", href: "/" }, { label: "بحث" }]}
-      >
-        <div className="mt-4 rounded-2xl border border-border bg-card/80 p-3 shadow-premium backdrop-blur-xl">
-          <div className="flex gap-2">
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="اكتب كلمة للبحث..."
-              className="h-12 flex-1 rounded-xl bg-transparent px-4 text-sm outline-none placeholder:text-muted-foreground"
-              autoFocus
-            />
-          </div>
-        </div>
-      </PageHeader>
-
       <section className="container py-10">
+        {/* Search input */}
+        <div className="relative mb-6">
+          <Search className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <input
+            className="w-full rounded-xl border border-border bg-muted/40 pr-11 pl-4 h-12 text-sm outline-none focus:border-accent"
+            placeholder="ابحث عن محامٍ أو قانون أو مقال..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+
         {/* Tabs */}
         <div className="mb-8 flex flex-wrap gap-2">
           {(["all", "lawyers", "laws", "articles"] as Tab[]).map((t) => (
@@ -95,6 +112,9 @@ export default function SearchPage() {
           ))}
         </div>
 
+        {/* Ad: أعلى البحث */}
+        <AdBanner placementKey="search-top" />
+
         {/* Results */}
         {!q ? (
           <div className="grid place-items-center rounded-2xl border border-dashed border-border py-20 text-center">
@@ -113,33 +133,33 @@ export default function SearchPage() {
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {(tab === "all" || tab === "lawyers") &&
               lawyerResults.map((l) => (
-                <a key={l.id} href={`/lawyers/${lawyerSlug(l)}`}>
+                <Link key={l.id} href={`/lawyers/${lawyerSlug(l)}`}>
                   <Card className="card-hover p-5">
                     <p className="text-xs text-accent font-semibold mb-2">محامٍ</p>
                     <h3 className="font-bold">{l.name}</h3>
                     <p className="text-sm text-muted-foreground">{l.specialization} — {l.city}</p>
                   </Card>
-                </a>
+                </Link>
               ))}
             {(tab === "all" || tab === "laws") &&
               lawResults.map((l) => (
-                <a key={l.id} href={`/laws/${l.id}`}>
+                <Link key={l.id} href={`/laws/${l.id}`}>
                   <Card className="card-hover p-5">
                     <p className="text-xs text-accent font-semibold mb-2">قانون</p>
                     <h3 className="font-bold">{l.name}</h3>
                     <p className="text-sm text-muted-foreground">{toArabicDigits(l.articles)} مادة</p>
                   </Card>
-                </a>
+                </Link>
               ))}
             {(tab === "all" || tab === "articles") &&
               articleResults.map((a) => (
-                <a key={a.id} href={`/blog/${a.id}`}>
+                <Link key={a.id} href={`/blog/${a.id}`}>
                   <Card className="card-hover p-5">
                     <p className="text-xs text-accent font-semibold mb-2">مقال</p>
                     <h3 className="font-bold line-clamp-2">{a.title}</h3>
                     <p className="text-sm text-muted-foreground">{a.author}</p>
                   </Card>
-                </a>
+                </Link>
               ))}
           </div>
         )}

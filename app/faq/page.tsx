@@ -1,4 +1,3 @@
-import { PageHeader } from "@/components/page-header";
 import { FaqSection } from "@/components/sections/faq";
 
 export const metadata = {
@@ -9,12 +8,6 @@ export const metadata = {
 export default function FaqPage() {
   return (
     <>
-      <PageHeader
-        eyebrow="الأسئلة الشائعة"
-        title="الأسئلة الشائعة"
-        subtitle="إجابات سريعة وواضحة عن استخدام المنصة وخدماتها."
-        crumbs={[{ label: "الرئيسية", href: "/" }, { label: "الأسئلة الشائعة" }]}
-      />
       <FaqSection />
     </>
   );

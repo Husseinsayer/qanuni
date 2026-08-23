@@ -1,8 +1,8 @@
-import { PageHeader } from "@/components/page-header";
 import { LawyerProfile } from "@/components/lawyer-profile";
 import { lawyers, lawyerSlug } from "@/lib/data";
 import { buildDescription, absoluteUrl } from "@/lib/seo";
 import { getSeoDefaults } from "@/lib/seo-defaults";
+import { JsonLd } from "@/components/json-ld";
 import type { Metadata } from "next";
 
 // Pre-generate static pages for demo lawyers + allow dynamic pages for registered ones
@@ -54,16 +54,15 @@ export default function LawyerProfilePage({ params }: { params: { id: string } }
   const lawyer = findLawyerStatic(decodedId);
   return (
     <>
-      <PageHeader
-        eyebrow="دليل المحامين"
-        title="ملف المحامي"
-        crumbs={[
-          { label: "الرئيسية", href: "/" },
-          { label: "المحامون", href: "/lawyers" },
-          { label: lawyer?.name ?? "المحامي" },
-        ]}
-      />
       <LawyerProfile id={lawyer?.id ?? params.id} />
+      <JsonLd page="lawyers" context={lawyer ? {
+        id: lawyer.id,
+        name: lawyer.name,
+        slug: decodedId,
+        specialization: lawyer.specialization,
+        city: lawyer.city,
+        email: lawyer.email || undefined,
+      } : undefined} />
     </>
   );
 }

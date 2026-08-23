@@ -6,9 +6,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  CreditCard, CheckCircle2, XCircle, Clock, Users, DollarSign,
-  ChevronDown, ChevronUp, Eye, Trash2, Plus, Save, Edit, ToggleLeft,
-  ToggleRight, AlertTriangle,
+  CreditCard, CheckCircle2, XCircle, Trash2, Plus, Save,
+  ToggleLeft, ToggleRight,
 } from "lucide-react";
 import {
   getAllPlans, saveAllPlans, addPlan, updatePlan, deletePlan,
@@ -22,7 +21,6 @@ import { cn } from "@/lib/utils";
 
 function PlansTab() {
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [editing, setEditing] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [newPlan, setNewPlan] = useState({
     nameAr: "", description: "", monthlyPrice: 0, yearlyPrice: 0, isDefault: false, active: true,
@@ -69,7 +67,7 @@ function PlansTab() {
   };
 
   const formatPrice = (price: number) =>
-    price === 0 ? "مجاني" : `${price.toLocaleString("ar-IQ")} د.ع`;
+    price === 0 ? "مجاني" : `${price.toLocaleString("en-US")} د.ع`;
 
   return (
     <div className="space-y-6">
@@ -209,7 +207,7 @@ function RequestsTab() {
   };
 
   const formatPrice = (price: number) =>
-    price === 0 ? "مجاني" : `${price.toLocaleString("ar-IQ")} د.ع`;
+    price === 0 ? "مجاني" : `${price.toLocaleString("en-US")} د.ع`;
 
   return (
     <div className="space-y-6">
@@ -230,7 +228,7 @@ function RequestsTab() {
                     <span className="font-medium"> {formatPrice(req.price)}</span>
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    طلب في: {new Date(req.requestedAt).toLocaleDateString("ar-IQ")}
+                    طلب في: {new Date(req.requestedAt).toLocaleDateString("en-US")}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -285,7 +283,7 @@ function SubscriptionsTab() {
   };
 
   const formatPrice = (price: number) =>
-    price === 0 ? "مجاني" : `${price.toLocaleString("ar-IQ")} د.ع`;
+    price === 0 ? "مجاني" : `${price.toLocaleString("en-US")} د.ع`;
 
   return (
     <div className="space-y-6">
@@ -317,7 +315,7 @@ function SubscriptionsTab() {
                   <td className="p-3">{formatPrice(s.price)}</td>
                   <td className="p-3">{statusBadge(s.status)}</td>
                   <td className="p-3 text-xs text-muted-foreground">
-                    {new Date(s.requestedAt).toLocaleDateString("ar-IQ")}
+                    {new Date(s.requestedAt).toLocaleDateString("en-US")}
                   </td>
                 </tr>
               ))}

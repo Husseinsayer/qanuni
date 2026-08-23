@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getItems } from "@/lib/knowledge-center/store";
 import { type LegalTerm } from "@/lib/knowledge-center/types";
-import { ChevronRight, Pencil, Trash2, ArrowLeft } from "lucide-react";
+import { ChevronRight, Pencil, ArrowLeft } from "lucide-react";
 
 export default function BookDetailPage() {
   const { id } = useParams<{ id: string }>();

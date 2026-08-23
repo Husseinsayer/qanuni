@@ -1,28 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Eye, MessageCircle, CalendarCheck, Phone, TrendingUp, BarChart3, Star, Users, Activity, ArrowUp, ArrowDown } from "lucide-react";
+import { Eye, MessageCircle, Phone, TrendingUp, BarChart3, Star, Users, Activity, ArrowUp, ArrowDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { getMyStats, getMyLawyerProfile, getMyReviews, getMyServices, getMyArticles, type LawyerStats } from "@/lib/lawyer-profiles";
-import { getUserSession } from "@/lib/user-auth";
 
 export default function AnalyticsPage() {
-  const router = useRouter();
   const [stats, setStats] = useState<LawyerStats | null>(null);
   const [servicesCount, setServicesCount] = useState(0);
   const [articlesCount, setArticlesCount] = useState(0);
   const [reviewsCount, setReviewsCount] = useState(0);
 
   useEffect(() => {
-    const s = getUserSession();
-    if (!s || s.role !== "lawyer") { router.push("/auth/login"); return; }
     setStats(getMyStats());
     setServicesCount(getMyServices().length);
     setArticlesCount(getMyArticles().length);
     setReviewsCount(getMyReviews().length);
-  }, [router]);
+  }, []);
 
   if (!stats) {
     return (
@@ -35,7 +30,6 @@ export default function AnalyticsPage() {
   const bigStats = [
     { label: "مشاهدات الملف", value: stats.totalViews, icon: Eye, color: "text-blue-600", bg: "bg-blue-100/80", change: +12 },
     { label: "الرسائل", value: stats.totalMessages, icon: MessageCircle, color: "text-emerald-600", bg: "bg-emerald-100/80", change: +5 },
-    { label: "الحجوزات", value: stats.totalBookings, icon: CalendarCheck, color: "text-purple-600", bg: "bg-purple-100/80", change: +8 },
     { label: "المكالمات", value: stats.totalCalls, icon: Phone, color: "text-rose-600", bg: "bg-rose-100/80", change: -2 },
     { label: "اكتمال الملف", value: `${getMyLawyerProfile() ? "%" : "0%"}`, icon: Activity, color: "text-amber-600", bg: "bg-amber-100/80" },
   ];
@@ -139,7 +133,6 @@ export default function AnalyticsPage() {
             {[
               { label: "المشاهدات", value: stats.totalViews, max: 200, color: "bg-blue-500" },
               { label: "الرسائل", value: stats.totalMessages, max: 50, color: "bg-emerald-500" },
-              { label: "الحجوزات", value: stats.totalBookings, max: 30, color: "bg-purple-500" },
               { label: "المكالمات", value: stats.totalCalls, max: 20, color: "bg-rose-500" },
               { label: "التقييمات", value: reviewsCount, max: 20, color: "bg-amber-500" },
             ].map((kpi) => {

@@ -27,7 +27,6 @@ import {
   Menu,
   X,
   Copy,
-  Share2,
   RotateCcw,
 } from "lucide-react";
 
@@ -198,47 +197,49 @@ export function ChatInterface() {
         caseType: data.caseType,
       };
 
-      const newMessages = [...state.messages, userMessage, assistantMessage];
+      setState((prev) => {
+        const newMessages = [...prev.messages, userMessage, assistantMessage];
 
-      setState((prev) => ({
-        ...prev,
-        messages: newMessages,
-        isLoading: false,
-        caseType: data.caseType,
-        confidence: data.confidence,
-        lawReferences: data.lawReferences || [],
-        answerSource: data.answerSource || "",
-        quality: data.quality || "",
-      }));
+        // Save to conversations
+        const convTitle =
+          prev.messages.length <= 1
+            ? content.length > 50
+              ? content.substring(0, 50) + "..."
+              : content
+            : conversations.find((c) => c.id === currentConvId)?.title ||
+              "محادثة جديدة";
 
-      // Save to conversations
-      const convTitle =
-        state.messages.length <= 1
-          ? content.length > 50
-            ? content.substring(0, 50) + "..."
-            : content
-          : conversations.find((c) => c.id === currentConvId)?.title ||
-            "محادثة جديدة";
+        if (currentConvId) {
+          updateConversation(currentConvId, {
+            messages: newMessages,
+            caseType: data.caseType,
+          });
+        } else {
+          const newConv: Conversation = {
+            id: `conv_${Date.now()}`,
+            title: convTitle,
+            messages: newMessages,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            caseType: data.caseType,
+            language: "ar",
+            status: "active",
+          };
+          addConversation(newConv);
+          setCurrentConvId(newConv.id);
+        }
 
-      if (currentConvId) {
-        updateConversation(currentConvId, {
+        return {
+          ...prev,
           messages: newMessages,
+          isLoading: false,
           caseType: data.caseType,
-        });
-      } else {
-        const newConv: Conversation = {
-          id: `conv_${Date.now()}`,
-          title: convTitle,
-          messages: newMessages,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          caseType: data.caseType,
-          language: "ar",
-          status: "active",
+          confidence: data.confidence,
+          lawReferences: data.lawReferences || [],
+          answerSource: data.answerSource || "",
+          quality: data.quality || "",
         };
-        addConversation(newConv);
-        setCurrentConvId(newConv.id);
-      }
+      });
 
       setConversations(getConversations());
     } catch (error) {
@@ -266,22 +267,24 @@ export function ChatInterface() {
       .reverse()
       .find((m) => m.role === "user");
     if (lastUser) {
-      // Remove last assistant message
       setState((prev) => ({
         ...prev,
         messages: prev.messages.slice(0, -1),
       }));
-      handleSend(lastUser.content);
+      // Use setTimeout to ensure state update is applied before sending
+      setTimeout(() => {
+        handleSend(lastUser.content);
+      }, 0);
     }
   };
 
   // === Handle Rating ===
-  const handleRate = useCallback((messageId: string, rating: number, feedback?: string) => {
+  const handleRate = useCallback((_messageId: string, _rating: number, _feedback?: string) => {
     // Here you would typically send the rating to your API
   }, []);
 
   // === Handle Quick Feedback ===
-  const handleFeedback = useCallback((messageId: string, type: "helpful" | "not_helpful" | "report") => {
+  const handleFeedback = useCallback((_messageId: string, _type: "helpful" | "not_helpful" | "report") => {
     // Here you would typically send the feedback to your API
   }, []);
 

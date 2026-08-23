@@ -1,13 +1,13 @@
 // ===== Iraqi Legal Assistant - AI Settings Admin Page =====
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getAIConfig, setAIConfig } from "@/lib/ai/settings-store";
 import { providerModels, providerNames, temperaturePresets } from "@/lib/ai/config";
 import type { AIConfig, AIProviderType } from "@/lib/ai/types";
-import { Save, RotateCcw, Eye, EyeOff } from "lucide-react";
+import { Save, Eye, EyeOff } from "lucide-react";
 import { toast } from "@/lib/admin-toast";
 
 export default function AISettingsPage() {
@@ -94,7 +94,7 @@ export default function AISettingsPage() {
               <button
                 type="button"
                 onClick={() => setShowApiKey(!showApiKey)}
-                className="absolute left-3 top-1/2 -translate-y-1/2"
+                className="absolute right-3 top-1/2 -translate-y-1/2"
               >
                 {showApiKey ? (
                   <EyeOff className="w-4 h-4 text-muted-foreground" />

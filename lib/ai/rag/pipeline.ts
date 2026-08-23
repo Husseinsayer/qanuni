@@ -24,7 +24,7 @@ export async function ragQuery(
   const instructions = options.instructions;
 
   // Step 1: Retrieve
-  const retrieval: RetrievalResult = retrieve(message, caseType);
+  const retrieval: RetrievalResult = await retrieve(message, caseType);
 
   // Step 2: Augment (build context with citations)
   const context: GenerationContext = buildGenerationContext(retrieval);

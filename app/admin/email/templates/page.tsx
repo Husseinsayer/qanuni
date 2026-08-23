@@ -6,11 +6,11 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  FileText, Plus, Eye, Edit3, Copy, Trash2, Save,
-  ChevronLeft, ToggleLeft, ToggleRight, Code, Type,
+  FileText, Eye, Copy, Trash2, Save,
+  ToggleLeft, ToggleRight, Code, Type,
 } from "lucide-react";
 import {
-  getEmailTemplates, updateEmailTemplate, addEmailTemplate,
+  getEmailTemplates, updateEmailTemplate,
   deleteEmailTemplate, duplicateEmailTemplate, type EmailTemplate,
 } from "@/lib/email-settings";
 import { toast } from "@/lib/admin-toast";

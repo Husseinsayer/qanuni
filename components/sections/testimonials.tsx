@@ -5,12 +5,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, ChevronLeft, Quote, Star } from "lucide-react";
 import { SectionTitle } from "@/components/ui/card";
 import { Reveal } from "@/components/reveal";
-import { testimonials } from "@/lib/data";
+import { useSiteData } from "@/lib/use-site-data";
 import { cn } from "@/lib/utils";
 
+const defaultTestimonials = [
+  { id: "t1", name: "أحمد الراشد", role: "رائد أعمال", rating: 5, text: "وفرت عليّ المنصة أسابيع من البحث. وجدت محامياً متخصصاً في تأسيس الشركات خلال دقائق.", initials: "أر", hue: "from-blue-500 to-indigo-600" },
+  { id: "t2", name: "منى الكعبي", role: "موظفة حكومية", rating: 5, text: "استشرت محامية في قضية حضانة وحصلت على إجابة دقيقة ومطمئنة في نفس اليوم.", initials: "مك", hue: "from-amber-500 to-orange-600" },
+  { id: "t3", name: "كريم العبيدي", role: "تاجر", rating: 4, text: "مكتبة القوانين منظمة بشكل رائع. أستطيع الرجوع لأي مادة قانونية بسهولة وسرعة.", initials: "كع", hue: "from-emerald-500 to-teal-600" },
+];
+
 export function Testimonials() {
+  const { testimonials: dbTestimonials } = useSiteData();
+  const items = dbTestimonials.length > 0 ? dbTestimonials : defaultTestimonials;
   const [index, setIndex] = React.useState(0);
-  const total = testimonials.length;
+  const total = items.length;
 
   const go = (dir: number) => setIndex((i) => (i + dir + total) % total);
 
@@ -36,25 +44,25 @@ export function Testimonials() {
               >
                 <Quote className="size-10 text-accent/30" />
                 <div className="mt-4 flex justify-center gap-1">
-                  {Array.from({ length: testimonials[index].rating }).map((_, i) => (
+                  {Array.from({ length: items[index]?.rating ?? 5 }).map((_, i) => (
                     <Star key={i} className="size-5 fill-gold text-gold" />
                   ))}
                 </div>
                 <p className="mt-5 text-center text-lg leading-relaxed md:text-xl">
-                  “{testimonials[index].text}”
+                  &quot;{items[index]?.text}&quot;
                 </p>
                 <div className="mt-6 flex items-center justify-center gap-3">
                   <span
                     className={cn(
                       "grid size-12 place-items-center rounded-full bg-gradient-to-br text-lg font-extrabold text-white",
-                      testimonials[index].hue
+                      items[index]?.hue
                     )}
                   >
-                    {testimonials[index].initials}
+                    {items[index]?.initials}
                   </span>
                   <div className="text-right">
-                    <p className="font-bold">{testimonials[index].name}</p>
-                    <p className="text-sm text-muted-foreground">{testimonials[index].role}</p>
+                    <p className="font-bold">{items[index]?.name}</p>
+                    <p className="text-sm text-muted-foreground">{items[index]?.role}</p>
                   </div>
                 </div>
               </motion.div>
@@ -66,10 +74,10 @@ export function Testimonials() {
                 onClick={() => go(-1)}
                 className="grid size-11 place-items-center rounded-full border border-border transition hover:border-accent hover:text-accent"
               >
-                <ChevronRight className="size-5" />
+                <ChevronLeft className="size-5" />
               </button>
               <div className="flex gap-2">
-                {testimonials.map((_, i) => (
+                {items.map((_, i) => (
                   <button
                     key={i}
                     aria-label={`شهادة ${i + 1}`}
@@ -86,7 +94,7 @@ export function Testimonials() {
                 onClick={() => go(1)}
                 className="grid size-11 place-items-center rounded-full border border-border transition hover:border-accent hover:text-accent"
               >
-                <ChevronLeft className="size-5" />
+                <ChevronRight className="size-5" />
               </button>
             </div>
           </div>

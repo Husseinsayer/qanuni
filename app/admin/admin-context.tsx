@@ -6,6 +6,7 @@ import { useAdminData, type AdminData } from "@/lib/admin-data";
 type AdminContextType = {
   data: AdminData;
   update: <K extends keyof AdminData>(field: K, value: AdminData[K]) => void;
+  updateBatch: (updates: Partial<AdminData>) => void;
   reset: () => void;
 };
 

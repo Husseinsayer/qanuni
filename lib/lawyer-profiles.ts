@@ -87,7 +87,6 @@ export interface Message {
 export interface LawyerStats {
   totalViews: number;
   totalMessages: number;
-  totalBookings: number;
   totalCalls: number;
   profileCompleteness: number;
   weeklyViews: number[];
@@ -147,7 +146,7 @@ function defaultWorkingHours(): WorkingHours {
 
 function emptyStats(): LawyerStats {
   return {
-    totalViews: 0, totalMessages: 0, totalBookings: 0, totalCalls: 0,
+    totalViews: 0, totalMessages: 0, totalCalls: 0,
     profileCompleteness: 0, weeklyViews: [4, 7, 3, 9, 12, 8, 15],
     weeklyMessages: [2, 1, 5, 3, 7, 4, 6],
   };
@@ -165,7 +164,7 @@ function getAllProfiles(): Lawyer[] {
   if (typeof window === "undefined") return defaultLawyers;
   try {
     // Check admin data first — this is the source of truth when admin panel is used
-    const adminRaw = localStorage.getItem("admin_data");
+    const adminRaw = localStorage.getItem("admin_site_data");
     if (adminRaw) {
       const adminData = JSON.parse(adminRaw);
       if (adminData?.lawyers && Array.isArray(adminData.lawyers) && adminData.lawyers.length > 0) {
@@ -195,23 +194,38 @@ function getAllProfiles(): Lawyer[] {
 
 function saveAllProfiles(p: Lawyer[]): void {
   localStorage.setItem(PROFILES_KEY, JSON.stringify(p));
+  // Also sync to admin_site_data if it's the source of truth
+  try {
+    const adminRaw = localStorage.getItem("admin_site_data");
+    if (adminRaw) {
+      const adminData = JSON.parse(adminRaw);
+      if (adminData && typeof adminData === "object") {
+        adminData.lawyers = p;
+        localStorage.setItem("admin_site_data", JSON.stringify(adminData));
+      }
+    }
+  } catch { /* noop */ }
 }
 
 function getLawyerId(): string | null {
   const session = getUserSession();
   if (!session || session.role !== "lawyer") return null;
   const profiles = getAllProfiles();
-  const byEmail = profiles.find((l) => l.whatsapp?.includes(session.email.split("@")[0]));
-  if (byEmail) return byEmail.id;
   const byId = profiles.find((l) => l.id === session.userId);
   if (byId) return byId.id;
+  const byEmail = profiles.find((l) => l.email === session.email);
+  if (byEmail) {
+    byEmail.id = session.userId;
+    saveAllProfiles(profiles);
+    return session.userId;
+  }
   const np: Lawyer = {
     id: session.userId, name: session.name, city: "بغداد",
     specialization: "القانون المدني", experience: 5, rating: 0, reviews: 0,
     verified: false, price: 30, online: true, gender: "male",
     languages: ["العربية"], bio: "", initials: session.name.slice(0, 2),
     hue: "from-blue-600 to-indigo-700", whatsapp: "", telegram: "",
-    facebook: "", instagram: "",
+    facebook: "", instagram: "", email: session.email,
   };
   profiles.push(np);
   saveAllProfiles(profiles);
@@ -236,23 +250,48 @@ export function resolveLawyer(slugOrId: string): Lawyer | null {
   return getAllProfiles().find((l) => l.id === slugOrId) ?? null;
 }
 
+function defaultExtForLawyer(lawyerId: string): ExtData {
+  const lawyer = defaultLawyers.find((l) => l.id === lawyerId);
+  if (!lawyer) return defaultExt();
+
+  const spec = lawyer.specialization;
+  return {
+    education: [
+      { id: "ed-default-1", degree: "بكالوريوس في القانون", institution: "جامعة بغداد", year: lawyer.experience > 15 ? 2005 : 2012, description: "حصل على تقدير امتياز" },
+      { id: "ed-default-2", degree: "ماجستير في " + spec, institution: "الجامعة المستنصرية", year: lawyer.experience > 15 ? 2008 : 2015, description: "" },
+    ],
+    certifications: [
+      { id: "cert-default-1", title: "شهادة الممارسة القانونية", issuer: "نقابة المحامين العراقيين", year: lawyer.experience > 15 ? 2006 : 2013 },
+      { id: "cert-default-2", title: "شهادة التحكيم التجاري", issuer: "اتحاد المحامين العرب", year: lawyer.experience > 15 ? 2010 : 2018 },
+    ],
+    services: [
+      { id: "svc-default-1", name: "استشارة قانونية", description: "استشارة في مجال " + spec, price: lawyer.price, duration: "30 دقيقة", online: true },
+      { id: "svc-default-2", name: "تمثيل قانوني", description: "تمثيل أمام المحاكم في قضايا " + spec, price: Math.round(lawyer.price * 1.5), duration: "حسب القضية", online: false },
+      { id: "svc-default-3", name: "صياغة عقود ومذكرات", description: "صياغة العقود والمذكرات القانونية", price: Math.round(lawyer.price * 0.8), duration: "حسب العقد", online: true },
+    ],
+    workingHours: defaultWorkingHours(),
+    portfolio: [
+      { id: "pf-default-1", title: "قضية " + spec, description: "تمثيل ناجح في إحدى قضايا " + spec, category: spec, year: 2024, outcome: "حكم لصالح العميل" },
+      { id: "pf-default-2", title: "استشارة " + spec, description: "تقديم استشارة قانونية شاملة في " + spec, category: spec, year: 2025, outcome: "تسوية ودية" },
+    ],
+    reviews: [],
+    memberships: ["نقابة المحامين العراقيين", "اتحاد المحامين العرب"],
+    awards: lawyer.experience > 15 ? ["جائزة التميز القانوني", "درع النقابة التقديري"] : ["جائزة التميز القانوني"],
+    messages: [],
+    seoDescription: "",
+    seoKeywords: [],
+    notificationEmail: true,
+    notificationPhone: true,
+  };
+}
+
 export function getExtByLawyerId(lawyerId: string): ExtData | null {
-  if (typeof window === "undefined") return null;
+  if (typeof window === "undefined") return defaultExtForLawyer(lawyerId);
   try {
     const raw = localStorage.getItem(EXT_KEY);
     const all: Record<string, ExtData> = raw ? JSON.parse(raw) : {};
-    return all[lawyerId] ?? null;
-  } catch { return null; }
-}
-
-export function getAllLawyerProfiles(): Lawyer[] {
-  return getAllProfiles();
-}
-
-/** Ensure the currently logged-in lawyer has a profile (creates one if missing). Returns true if created. */
-export function ensureLawyerProfile(): boolean {
-  const id = getLawyerId();
-  return id !== null;
+    return all[lawyerId] ?? defaultExtForLawyer(lawyerId);
+  } catch { return defaultExtForLawyer(lawyerId); }
 }
 
 export function updateMyProfile(u: Partial<Omit<Lawyer, "id">>): Lawyer | null {
@@ -547,11 +586,6 @@ export function blockUser(messageId: string): void {
   ));
 }
 
-export function getBlockedUsers(): string[] {
-  const msgs = getMyMessages();
-  return [...new Set(msgs.filter((m) => m.blocked).map((m) => m.fromEmail))];
-}
-
 export function seedDemoMessages(): void {
   const ext = getOrCreateExt();
   if (!ext || !ext.messages || ext.messages.length > 0) return;
@@ -605,52 +639,12 @@ export function getMyStats(): LawyerStats {
   } catch { return emptyStats(); }
 }
 
-export function incrementStat(field: keyof LawyerStats): void {
-  const id = getLawyerId(); if (!id) return;
-  try {
-    const raw = localStorage.getItem(STATS_KEY);
-    const all: Record<string, LawyerStats> = raw ? JSON.parse(raw) : {};
-    if (!all[id]) all[id] = emptyStats();
-    if (typeof all[id][field] === "number") (all[id][field] as number)++;
-    localStorage.setItem(STATS_KEY, JSON.stringify(all));
-  } catch { /* noop */ }
-}
-
 /* ─── Articles ─── */
 
 export function getMyArticles() {
   const profile = getMyLawyerProfile();
   if (!profile) return [];
   return defaultArticles.filter((a) => a.lawyerId === profile.id || a.author.includes(profile.name));
-}
-
-/* ─── Completeness ─── */
-
-export function computeCompleteness(profile: Lawyer, ext?: ExtData | null): number {
-  let score = 0; let total = 0;
-  if (profile.name) score++; total++;
-  if (profile.city) score++; total++;
-  if (profile.specialization) score++; total++;
-  if (profile.experience > 0) score++; total++;
-  if (profile.bio && profile.bio.length > 10) score++; total++;
-  if (profile.languages.length > 0) score++; total++;
-  if (profile.price > 0) score++; total++;
-  if (profile.whatsapp) score++; total++;
-  if (profile.telegram) score++; total++;
-  if (profile.facebook || profile.instagram) score++; total++;
-  if (ext) {
-    if (ext.education.length > 0) score++; total++;
-    if (ext.certifications.length > 0) score++; total++;
-    if (ext.services.length > 0) score++; total++;
-    if (ext.memberships.length > 0) score++; total++;
-    if (ext.portfolio.length > 0) score++; total++;
-  }
-  return total > 0 ? Math.round((score / total) * 100) : 0;
-}
-
-export function getOverallCompleteness(): number {
-  const profile = getMyLawyerProfile();
-  return profile ? computeCompleteness(profile, getOrCreateExt()) : 0;
 }
 
 /* ─── Seed demo data ─── */

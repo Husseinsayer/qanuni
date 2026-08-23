@@ -28,10 +28,8 @@ import {
   Plus,
   Edit,
   Save,
-  Calendar,
   DollarSign,
   TrendingUp,
-  Users,
   BarChart3,
   Filter,
   Eye,
@@ -434,10 +432,10 @@ export default function PromotionsAdminPage() {
                             <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
                               <span>الخطة: {lawyer.promotionPlan.type === "monthly" ? "شهرية" : "سنوية"}</span>
                               {lawyer.promotionPlan.startDate && (
-                                <span>من: {new Date(lawyer.promotionPlan.startDate).toLocaleDateString("ar-IQ")}</span>
+                                <span>من: {new Date(lawyer.promotionPlan.startDate).toLocaleDateString("en-US")}</span>
                               )}
                               {lawyer.promotionPlan.expiryDate && (
-                                <span>إلى: {new Date(lawyer.promotionPlan.expiryDate).toLocaleDateString("ar-IQ")}</span>
+                                <span>إلى: {new Date(lawyer.promotionPlan.expiryDate).toLocaleDateString("en-US")}</span>
                               )}
                             </div>
                           )}
@@ -507,7 +505,7 @@ export default function PromotionsAdminPage() {
                     <div>
                       <h3 className="text-lg font-bold">{plan.name}</h3>
                       <p className="text-2xl font-extrabold text-accent mt-1">
-                        {plan.price.toLocaleString("ar-IQ")} د.ع
+                        {plan.price.toLocaleString("en-US")} د.ع
                         <span className="text-sm font-normal text-muted-foreground">/{plan.type === "monthly" ? "شهرياً" : "سنوياً"}</span>
                       </p>
                     </div>

@@ -7,7 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   FileText, Search, Download, Trash2, ChevronLeft, ChevronRight,
-  CheckCircle2, XCircle, Clock, AlertTriangle, Filter,
+  CheckCircle2, XCircle, Clock, AlertTriangle,
 } from "lucide-react";
 import { getEmailLogs, clearEmailLogs, type EmailLog } from "@/lib/email-settings";
 import { toast } from "@/lib/admin-toast";
@@ -121,7 +121,7 @@ export default function EmailLogsPage() {
                 return (
                   <tr key={log.id} className="border-b hover:bg-muted/30">
                     <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(log.timestamp).toLocaleDateString("ar-IQ")} {new Date(log.timestamp).toLocaleTimeString("ar-IQ", { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(log.timestamp).toLocaleDateString("en-US")} {new Date(log.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                     </td>
                     <td className="p-3">{log.recipient}</td>
                     <td className="p-3 max-w-[200px] truncate">{log.subject}</td>
@@ -171,7 +171,7 @@ export default function EmailLogsPage() {
               <p><span className="text-muted-foreground">المستلم:</span> {selected.recipient}</p>
               <p><span className="text-muted-foreground">المُرسل:</span> {selected.sender}</p>
               <p><span className="text-muted-foreground">العنوان:</span> {selected.subject}</p>
-              <p><span className="text-muted-foreground">التاريخ:</span> {new Date(selected.timestamp).toLocaleString("ar-IQ")}</p>
+              <p><span className="text-muted-foreground">التاريخ:</span> {new Date(selected.timestamp).toLocaleString("en-US")}</p>
               <p><span className="text-muted-foreground">الحالة:</span> {statusMap[selected.status]?.label ?? selected.status}</p>
               <p><span className="text-muted-foreground">وقت التسليم:</span> {selected.deliveryTime}ms</p>
             </div>

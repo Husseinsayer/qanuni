@@ -6,12 +6,8 @@ import {
 import type {
   LegalProcedure,
   LegalTemplate,
-  GovService,
   KnowledgeQA,
   LegalTerm,
-  GovernmentBody,
-  RequiredDocument,
-  Keyword,
 } from "./types";
 
 // === Search Result Types ===

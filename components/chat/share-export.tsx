@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import type { Conversation } from "@/lib/ai/types";
-import { Download, Share2, Copy, Check, FileText, Image } from "lucide-react";
+import { Download, Share2, Copy, Check, FileText, Image as ImageIcon } from "lucide-react";
 
 type ShareExportProps = {
   conversation: Conversation;
@@ -160,7 +160,7 @@ ${conversation.messages
               onClick={printConversation}
               className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-muted transition-colors"
             >
-              <Image className="w-4 h-4" />
+              <ImageIcon className="w-4 h-4" />
               طباعة
             </button>
           </div>

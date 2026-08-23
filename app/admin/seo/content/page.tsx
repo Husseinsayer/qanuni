@@ -9,11 +9,9 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Search, CheckCircle2, XCircle } from "lucide-react";
-import { useAdminContext } from "../../admin-context";
 import { analyzeContent } from "@/lib/seo";
 
 export default function ContentAnalyzerPage() {
-  const { data } = useAdminContext();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [keyword, setKeyword] = useState("");

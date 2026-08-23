@@ -1,11 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, BookOpen, CalendarDays } from "lucide-react";
-import { SectionTitle, Card, Badge } from "@/components/ui/card";
+import { ArrowLeft, BookOpen, CalendarDays, Scale, Gavel, HeartHandshake, Users, Car, Building2, Landmark, Briefcase } from "lucide-react";
+import { SectionTitle, Card } from "@/components/ui/card";
 import { Reveal, fadeUp, staggerContainer } from "@/components/reveal";
 import { useSiteData } from "@/lib/use-site-data";
-import { cn, toArabicDigits } from "@/lib/utils";
+import { toArabicDigits } from "@/lib/utils";
+
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  Scale, Gavel, HeartHandshake, Users, Car, Building2, Landmark, Briefcase,
+};
 
 export function LawsSection() {
   const { laws, isLoading } = useSiteData();
@@ -34,7 +39,7 @@ export function LawsSection() {
           className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4"
         >
           {laws.map((law) => {
-            const Icon = law.icon;
+            const Icon = iconMap[law.icon] || Scale;
             return (
               <motion.div key={law.id} variants={fadeUp}>
                 <Card className="card-hover group h-full p-6">
@@ -44,9 +49,9 @@ export function LawsSection() {
                   >
                     <Icon className="size-6" />
                   </div>
-                  <a href={`/laws/${law.id}`} className="text-lg font-bold transition hover:text-accent">
+                  <Link href={`/laws/${law.id}`} className="text-lg font-bold transition hover:text-accent">
                     {law.name}
-                  </a>
+                  </Link>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {toArabicDigits(law.articles)} مادة قانونية
                   </p>

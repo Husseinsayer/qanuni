@@ -1,6 +1,6 @@
 import Content from "./content";
 
-export const dynamicParams = false;
+export const dynamicParams = true;
 
 export function generateStaticParams() {
   return [{ id: '__admin__' }];

@@ -1,21 +1,22 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { motion } from "framer-motion";
-import { Scale, Mail, Lock, User, Phone, ArrowLeft, Check } from "lucide-react";
+import { Scale, Mail, Lock, User, Phone, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { registerUser, loginUser, getUserSession } from "@/lib/user-auth";
-import { ensureLawyerProfile } from "@/lib/lawyer-profiles";
-import { getDefaultPlan } from "@/lib/lawyer-plans";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
   const [done, setDone] = React.useState(false);
   const [error, setError] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
+  const [, setLoading] = React.useState(false);
   const [role, setRole] = React.useState<"user" | "lawyer">("user");
+  const [idImage, setIdImage] = React.useState<string>("");
+  const [specialization, setSpecialization] = React.useState("");
   const [formData, setFormData] = React.useState({
     name: "",
     email: "",
@@ -25,13 +26,15 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   });
   const isRegister = mode === "register";
 
-  function dashboardUrl(): string {
-    const session = getUserSession();
-    return session?.role === "lawyer" ? "/lawyer/dashboard" : "/client/dashboard";
+  function dashboardUrl(roleName?: string): string {
+    const r = roleName || role;
+    if (r === "admin") return "/admin";
+    if (r === "lawyer") return "/lawyer/dashboard";
+    return "/client/dashboard";
   }
 
   React.useEffect(() => {
-    if (done) {
+    if (done && !(isRegister && role === "lawyer")) {
       const t = setTimeout(() => router.push(dashboardUrl()), 1500);
       return () => clearTimeout(t);
     }
@@ -50,52 +53,77 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         setLoading(false);
         return;
       }
-      const err = await registerUser(name, email, phone, password, role === "lawyer" ? "lawyer" : "user");
-      if (err) {
-        setError(err);
+
+      if (role === "lawyer" && !idImage) {
+        setError("يجب رفع صورة هوية المحامي للتحقق");
         setLoading(false);
         return;
       }
-      // Auto-login after registration
-      await loginUser(email, password);
-      // Immediately create lawyer profile for new lawyer registrations
-      if (role === "lawyer") {
-        ensureLawyerProfile();
-        // Assign default subscription plan
-        try {
-          const defaultPlan = getDefaultPlan();
-          const subsRaw = localStorage.getItem("lawyer_plan_subscriptions");
-          const subs = subsRaw ? JSON.parse(subsRaw) : [];
-          const session = JSON.parse(localStorage.getItem("user_session") || "{}");
-          if (session.userId && !subs.find((s: any) => s.lawyerId === session.userId)) {
-            subs.push({
-              id: `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-              lawyerId: session.userId,
-              lawyerName: session.name,
-              lawyerEmail: session.email,
-              planId: defaultPlan.id,
-              planName: defaultPlan.nameAr,
-              billingCycle: "monthly",
-              status: "active",
-              price: 0,
-              startDate: new Date().toISOString(),
-              expiryDate: "",
-              requestedAt: new Date().toISOString(),
-              approvedAt: new Date().toISOString(),
-            });
-            localStorage.setItem("lawyer_plan_subscriptions", JSON.stringify(subs));
-          }
-        } catch { /* silent */ }
+
+      try {
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            email,
+            phone,
+            password,
+            role: role === "lawyer" ? "lawyer" : "user",
+            specialization: role === "lawyer" ? specialization : undefined,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          setError(data.error || "فشل إنشاء الحساب");
+          setLoading(false);
+          return;
+        }
+
+        // Lawyers: show pending approval notice, don't auto-login
+        if (role === "lawyer") {
+          setDone(true);
+          setLoading(false);
+          return;
+        }
+
+        // Regular users: show pending approval notice
+        setDone(true);
+        setLoading(false);
+        return;
+      } catch {
+        setError("حدث خطأ في الاتصال بالخادم");
+        setLoading(false);
+        return;
       }
+
       setDone(true);
     } else {
-      const ok = await loginUser(email, password);
-      if (!ok) {
-        setError("البريد الإلكتروني أو كلمة المرور غير صحيحة");
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (!result?.ok) {
+        setError(result?.error || "البريد الإلكتروني أو كلمة المرور غير صحيحة");
         setLoading(false);
         return;
       }
+
+      // Determine redirect based on user role
+      try {
+        const meRes = await fetch("/api/auth/me");
+        if (meRes.ok) {
+          const { user } = await meRes.json();
+          router.push(dashboardUrl(user?.role));
+          router.refresh();
+          return;
+        }
+      } catch { /* silent fallback */ }
       router.push(dashboardUrl());
+      router.refresh();
     }
   };
 
@@ -128,9 +156,17 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                 <Check className="size-7" />
               </span>
               <h3 className="mt-4 text-lg font-bold">
-                {isRegister ? "تم إنشاء حسابك بنجاح" : "تم تسجيل الدخول بنجاح"}
+                {isRegister
+                  ? "تم استلام طلب التسجيل"
+                  : "تم تسجيل الدخول بنجاح"}
               </h3>
-              <p className="mt-1 text-sm text-muted-foreground">جارٍ تحويلك إلى الصفحة الرئيسية...</p>
+              {isRegister ? (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  طلبك قيد المراجعة من قبل الإدارة. سنرسل لك إشعاراً عند الموافقة عليه.
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-muted-foreground">جارٍ تحويلك إلى الصفحة الرئيسية...</p>
+              )}
             </div>
           ) : (
             <form onSubmit={submit} className="space-y-4">
@@ -159,6 +195,63 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                   </div>
                 </div>
               )}
+              {isRegister && role === "lawyer" && (
+                <>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold">التخصص القانوني</label>
+                    <select
+                      value={specialization}
+                      onChange={(e) => setSpecialization(e.target.value)}
+                      className="h-11 w-full rounded-xl border border-border bg-muted/40 px-4 text-sm outline-none focus:border-accent"
+                      required
+                    >
+                      <option value="">اختر التخصص...</option>
+                      <option value="القانون المدني">القانون المدني</option>
+                      <option value="القانون الجنائي">القانون الجنائي</option>
+                      <option value="الأحوال الشخصية">الأحوال الشخصية</option>
+                      <option value="القانون التجاري">القانون التجاري</option>
+                      <option value="القانون الإداري">القانون الإداري</option>
+                      <option value="قانون العمل">قانون العمل</option>
+                      <option value="القانون العقاري">القانون العقاري</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold">صورة هوية المحامي أو بطاقة النقابة</label>
+                    <p className="mb-2 text-xs text-muted-foreground">للتحقق من هويتك كمحامٍ مرخص</p>
+                    <div className="relative flex items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/20 p-6 transition hover:border-accent/50">
+                      {idImage ? (
+                        <div className="text-center">
+                          <img src={idImage} alt="صورة الهوية" className="mx-auto h-32 rounded-lg object-contain" />
+                          <button type="button" onClick={() => setIdImage("")} className="mt-2 text-xs font-semibold text-danger hover:underline">
+                            إزالة الصورة
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer text-center">
+                          <svg className="mx-auto size-10 text-muted-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                          </svg>
+                          <span className="mt-2 block text-sm font-semibold text-muted-foreground">اضغط لرفع صورة</span>
+                          <span className="text-xs text-muted-foreground/70">PNG, JPG (حد أقصى 5MB)</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 5 * 1024 * 1024) { setError("حجم الصورة يتجاوز 5MB"); return; }
+                              const reader = new FileReader();
+                              reader.onload = (ev) => setIdImage(ev.target?.result as string);
+                              reader.readAsDataURL(file);
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
               <Field icon={Mail} label="البريد الإلكتروني" type="email" placeholder="you@example.com" required
                 value={formData.email} onChange={(v) => setFormData({ ...formData, email: v })} />
               {isRegister && (
@@ -177,9 +270,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                   <label className="flex items-center gap-2 text-muted-foreground">
                     <input type="checkbox" className="size-4 rounded border-border" /> تذكرني
                   </label>
-                  <a href="/auth/forgot-password" className="font-semibold text-accent">
+                  <Link href="/auth/forgot-password" className="font-semibold text-accent">
                     نسيت كلمة المرور؟
-                  </a>
+                  </Link>
                 </div>
               )}
 

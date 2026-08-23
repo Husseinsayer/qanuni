@@ -8,7 +8,6 @@ import {
   Settings,
   MessageSquare,
   HelpCircle,
-  Search,
   FileText,
   BarChart3,
   MessageCircle,
